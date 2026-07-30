@@ -66,6 +66,10 @@ class Paths:
     work_dir: Path
     continuum_local_dir: Path | None = None
     gama_catalogue: Path | None = None
+    #: Full-field moment-0 mosaic (SoFiA's own output, e.g. `run_sofia/mom0.fits`),
+    #: used only by Phase 5 postprocess to place true-flagged detections in context.
+    #: Optional -- the mosaic step is skipped (not an error) if unset.
+    field_mosaic: Path | None = None
 
     @property
     def combined_catalogue(self) -> Path:
@@ -129,6 +133,7 @@ class Config:
                 work_dir=resolve(raw_paths["work_dir"]),
                 continuum_local_dir=resolve(raw_paths.get("continuum_local_dir")),
                 gama_catalogue=resolve(raw_paths.get("gama_catalogue")),
+                field_mosaic=resolve(raw_paths.get("field_mosaic")),
             )
         except KeyError as exc:
             raise ValueError(f"Config 'paths' section is missing required key: {exc}") from exc
@@ -163,3 +168,5 @@ class Config:
             )
         if self.paths.gama_catalogue is not None and not self.paths.gama_catalogue.is_file():
             raise ValueError(f"paths.gama_catalogue does not exist: {self.paths.gama_catalogue}")
+        if self.paths.field_mosaic is not None and not self.paths.field_mosaic.is_file():
+            raise ValueError(f"paths.field_mosaic does not exist: {self.paths.field_mosaic}")

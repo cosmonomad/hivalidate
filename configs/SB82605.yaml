@@ -12,6 +12,9 @@ paths:
   # No GAMA catalogue shipped with this example dataset -- leave unset (null) rather
   # than pointing at a path that doesn't exist; cross-matching is skipped when unset.
   gama_catalogue: null
+  # Full-field moment-0 mosaic, used by Phase 5 postprocess to place true-flagged
+  # detections in context. Optional -- the mosaic step is skipped if unset.
+  field_mosaic: ../data/run_sofia/mom0.fits
 
 dedup:
   sep_arcsec: 30.0

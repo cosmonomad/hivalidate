@@ -312,10 +312,29 @@ Package name: `hivalidate` (confirmed).
   terminal `input()`) can't be exercised by an automated tool the way SkyView or
   CASDA calls could -- that part needs a human running `hivalidate-qa` themselves.
 
-### Phase 5 — Post-processing
-- [ ] `postprocess.py`: migrate `create_validation_csv.py`, `extract_true_cubelets.py`,
-      `mosaic_sofia_true_detections.py`, aligning directory naming end-to-end so no
-      manual renaming is needed between stages (fixes issue #4)
+### Phase 5 — Post-processing [DONE 2026-07-30]
+- [x] `postprocess.py`: `filter_by_qa` + `write_validation_csv` (replaces
+      `legacy/create_validation_csv.py` -- much simpler now, since it no longer needs
+      to reverse-engineer which sources are "true" from a directory of PNG
+      filenames; `validated_cat.xml` already carries the `qa` flag directly),
+      `extract_cubelets` (replaces `legacy/extract_true_cubelets.py`), `build_mosaic`
+      (replaces `legacy/mosaic_sofia_true_detections.py`, via
+      `reproject.mosaicking.reproject_and_coadd` onto the full-field mosaic's WCS --
+      verified against `reproject`'s actual installed signature, not memory).
+      `hivalidate-postprocess` runs all three from a `validated_cat.xml`, fixing
+      issue #4 (directory-naming mismatch between stages) since every stage now
+      reads/writes through `Config.paths`, not ad hoc constants.
+- Added `paths.field_mosaic` to the config schema (optional; the full-field
+  `mom0.fits` the mosaic step needs) -- the mosaic step is skipped, not an error,
+  when unset.
+- **Ran for real** end-to-end (dry-run -> QA -> postprocess) against 5 real sources
+  from `data/work/SB82605/`, scripted to flag 3 true, and against the real
+  `data/run_sofia/mom0.fits` full-field mosaic (3585x3552, not a synthetic
+  stand-in). `validated_true.csv` correctly contained exactly the 3 true-flagged
+  sources; `true_cubelets/` had exactly their files (13 each); the mosaic FITS
+  correctly matched the field's shape/WCS, and rendering it confirmed by eye that
+  the three tiny detections land at their real, distinct sky positions within the
+  full field.
 
 ### Phase 6 — End-to-end validation
 - [ ] Run the full pipeline over all 45 `run_sofia/` runs: combine → dedup → rename →

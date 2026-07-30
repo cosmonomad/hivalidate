@@ -219,7 +219,7 @@ Package name: `hivalidate` (confirmed).
   this is real, not over-merging (accepted pairs: median 0.33″/0.4 km/s separation;
   correctly-rejected sky-close pairs: thousands of km/s apart in velocity).
 
-### Phase 2 — Cutout layer [DONE 2026-07-30, one backend unverified]
+### Phase 2 — Cutout layer [DONE 2026-07-30, fully verified live]
 - [x] `cutouts/base.py`: fallback-chain abstraction, on-disk cache (FITS, keyed by
       source/backend/size), retry/backoff (generalized from the SkyView pattern)
 - [x] `cutouts/optical.py`: `SkyViewBackend` (migrated), `LegacySurveyBackend`
@@ -231,13 +231,22 @@ Package name: `hivalidate` (confirmed).
 - [x] `cutouts/continuum.py`: `LocalContinuumBackend` (MontagePy `mSubimage`) --
       **verified live** against the real `data/continuum_image/*.fits` and real
       source positions, including the out-of-footprint error path.
-      `RacsCasdaBackend` (`astroquery.casda`) -- implemented against the literal
-      code examples in astroquery's CASDA docs (not memory), with non-interactive
-      login via seeding the OS keyring (astroquery's `login()` has no `password=`
-      parameter -- it only reads from keyring or an interactive prompt; this was
-      confirmed by reading astroquery's source, not assumed). **Not verified live
-      -- no CASDA/OPAL credentials were available in the dev environment.** See
-      README.md "CASDA / RACS access" for exactly how to verify it.
+      `RacsCasdaBackend` (`astroquery.casda`) -- **verified live 2026-07-30** with a
+      real OPAL account, after this environment's astroquery (0.4.11) turned out to
+      have a real bug: `CasdaClass.login()` is an auto-generated wrapper that
+      discards its own return value, so it always evaluates as `None`/falsy no
+      matter what actually happened. `RacsCasdaBackend._ensure_login()` was
+      originally written trusting that return value (matching the astroquery docs'
+      own example) and consequently reported every successful login as a failure --
+      caught only by testing against a real account, not by the mocked tests, which
+      had unknowingly encoded the same wrong assumption. Fixed by checking
+      `casda.authenticated()` instead, which reads the real internal state. Also
+      found live: a real RACS cutout comes back with degenerate Stokes/frequency
+      axes (shape `(1, 1, ny, nx)`, not the 2D shape every other backend returns) --
+      `fetch()` now squeezes them, and raises clearly instead of silently
+      mis-plotting if a future cutout genuinely has more than one such plane. Both
+      fixes are covered by regression tests built from the real observed shapes/
+      behaviour, not just the original guesses.
 - [x] Preflight check: `hivalidate-check-connectivity`, run for real against
       `configs/SB82605.yaml` -- correctly reported SkyView OK, Legacy Survey FAILED
       (real live outage), local continuum OK, RACS/CASDA FAILED with an actionable

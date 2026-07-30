@@ -7,13 +7,15 @@ source positions from `data/run_sofia/` during development -- see the Phase 2 co
 message for the exact commands and output; that's what grounds the WCS/units/error
 handling below, not just what the synthetic fixture happens to exercise.
 
-`RacsCasdaBackend` cannot be tested live (no CASDA/OPAL credentials in this
-environment) -- see README.md "CASDA / RACS access" for how to verify it yourself.
-The tests here mock `astroquery.casda.Casda` to check our own orchestration logic
-(login/keyring handling, RACS filtering, cutout/download flow) against the exact
-API shape documented at
-https://astroquery.readthedocs.io/en/latest/casda/casda.html -- they cannot catch a
-real API or auth failure, only a regression in how we call it.
+`RacsCasdaBackend` was verified live 2026-07-30 against a real OPAL account (see
+cutouts/continuum.py's module docstring and the Phase 2 follow-up commit for what
+that caught: astroquery's `login()` always returning `None`/falsy, and real cutouts
+having degenerate Stokes/frequency axes). The tests here mock
+`astroquery.casda.Casda` to check our own orchestration logic (login/keyring
+handling, RACS filtering, cutout/download flow, the squeeze fix) fast and without
+network access -- `FakeCasdaInstance` is deliberately built to reproduce both bugs
+(see its docstring) so a regression in either one fails a mocked test too, not just
+a future live run.
 """
 
 from __future__ import annotations
@@ -103,6 +105,14 @@ class TestLocalContinuumBackend:
 
 
 class FakeCasdaInstance:
+    """Mimics the real (buggy, in astroquery 0.4.11) `CasdaClass` behaviour found
+    live 2026-07-30: `login()` always returns `None` regardless of outcome, and only
+    `authenticated()` reflects whether it actually succeeded. `login_result` here
+    controls what `authenticated()` reports, not `login()`'s return value -- if a
+    test accidentally relies on `login()`'s return value again in the future, it
+    will get `None` here too and fail the same way the real bug did.
+    """
+
     def __init__(self, login_result=True, cutout_urls=None, download_files=None):
         self._login_result = login_result
         self._cutout_urls = cutout_urls or ["http://example.test/cutout.fits"]
@@ -112,6 +122,9 @@ class FakeCasdaInstance:
 
     def login(self, *, username):
         self.login_calls.append(username)
+        return None
+
+    def authenticated(self):
         return self._login_result
 
     def cutout(self, table, *, coordinates, height, width):
@@ -121,11 +134,12 @@ class FakeCasdaInstance:
     def download_files(self, urls, *, savedir):
         if self._download_files_result is not None:
             return self._download_files_result
-        # Write a minimal real FITS so the caller's fits.open succeeds.
+        # Shape (1, 1, ny, nx): matches the real degenerate Stokes/frequency axes
+        # CASDA's cutout service actually returns, confirmed live 2026-07-30.
         wcs = WCS(naxis=2)
         wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
         path = f"{savedir}/racs_cutout.fits"
-        fits.writeto(path, np.ones((10, 10)), wcs.to_header(), overwrite=True)
+        fits.writeto(path, np.ones((1, 1, 10, 10)), wcs.to_header(), overwrite=True)
         return [path]
 
 
@@ -238,6 +252,42 @@ class TestRacsCasdaBackendFetchMocked:
         backend = RacsCasdaBackend()
         result = backend.fetch(FIELD_CENTRE, size_arcsec=60.0)
         assert result.provenance == "racs_casda:RACS-DR1_0000+00A.fits"
+
+    def test_squeezes_degenerate_stokes_and_frequency_axes_to_2d(
+        self, monkeypatch, fake_casda_class
+    ):
+        # Regression test: a real RACS cutout came back live 2026-07-30 with shape
+        # (1, 1, ny, nx), not the 2D shape every other backend returns. The mock's
+        # default download_files() already reproduces that shape (see
+        # FakeCasdaInstance.download_files) -- this asserts fetch() squeezes it.
+        monkeypatch.setenv("CASDA_USERNAME", "someone@example.org")
+        monkeypatch.delenv("CASDA_PASSWORD", raising=False)
+        backend = RacsCasdaBackend()
+        result = backend.fetch(FIELD_CENTRE, size_arcsec=60.0)
+        assert result.data.ndim == 2
+        assert result.data.shape == (10, 10)
+
+    def test_non_squeezable_shape_raises_cutout_unavailable(self, monkeypatch, fake_casda_class):
+        # If a cutout genuinely has more than one Stokes/frequency plane, squeeze()
+        # can't reduce it to 2D -- must fail loudly, not silently plot one slice.
+        monkeypatch.setenv("CASDA_USERNAME", "someone@example.org")
+        monkeypatch.delenv("CASDA_PASSWORD", raising=False)
+
+        def download_files_with_extra_plane(urls, *, savedir):
+            wcs = WCS(naxis=2)
+            wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
+            path = f"{savedir}/racs_cutout.fits"
+            fits.writeto(path, np.ones((2, 10, 10)), wcs.to_header(), overwrite=True)
+            return [path]
+
+        instance = FakeCasdaInstance()
+        instance.download_files = download_files_with_extra_plane
+        fake_casda_class.instances_override = instance
+        monkeypatch.setattr(fake_casda_class, "__new__", lambda cls: instance)
+
+        backend = RacsCasdaBackend()
+        with pytest.raises(CutoutUnavailable, match="Expected a 2D cutout"):
+            backend.fetch(FIELD_CENTRE, size_arcsec=60.0)
 
     def test_no_matching_racs_image_raises_cutout_unavailable(self, monkeypatch, fake_casda_class):
         monkeypatch.setenv("CASDA_USERNAME", "someone@example.org")

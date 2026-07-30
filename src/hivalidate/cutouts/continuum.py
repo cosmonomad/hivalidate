@@ -7,14 +7,17 @@ having no continuum image at all when no local mosaic covers a field).
 `data/run_sofia/` during development (see the Phase 2 commit message for exact
 commands/output) -- both the success and the "outside image footprint" error paths.
 
-`RacsCasdaBackend` could not be tested live during development (no CASDA/OPAL
-credentials were available in that environment) -- see README.md "CASDA / RACS
-access" for how to verify it. Its `query_region`/`cutout`/`download_files` usage
-matches the literal examples in the astroquery CASDA docs
-(https://astroquery.readthedocs.io/en/latest/casda/casda.html), not a guess from
-memory, but "matches the docs" and "confirmed working end-to-end" are not the same
-claim -- treat this backend as unverified until you've run
-`hivalidate-check-connectivity` successfully yourself.
+`RacsCasdaBackend` was verified live 2026-07-30 against a real OPAL account (login,
+RACS filtering, cutout request, and download all confirmed working end to end). Its
+`query_region`/`cutout`/`download_files` usage matches the literal examples in the
+astroquery CASDA docs (https://astroquery.readthedocs.io/en/latest/casda/casda.html),
+which is what let two real bugs get caught quickly once real credentials were
+available, rather than being masked by mocks built around the same wrong assumptions:
+astroquery 0.4.11's `login()` always returns `None`/falsy regardless of outcome (this
+backend checks `casda.authenticated()` instead), and a real cutout response has
+degenerate Stokes/frequency axes -- shape `(1, 1, ny, nx)`, not 2D -- which `fetch()`
+now squeezes down. See README.md "CASDA / RACS access" if you need to re-verify on a
+new machine/account (keyring behaviour is environment-specific).
 """
 
 from __future__ import annotations
@@ -176,10 +179,18 @@ class RacsCasdaBackend(CutoutBackend):
 
         casda = Casda()
         try:
-            authenticated = casda.login(username=username)
+            # Deliberately not trusting casda.login()'s return value: in the
+            # astroquery version this was verified against (0.4.11), CasdaClass's
+            # login() is an auto-generated wrapper around QueryWithLogin._login that
+            # discards its return value, so it always evaluates as None/falsy --
+            # confirmed live 2026-07-30 (astroquery's own log said "Authentication
+            # successful!" immediately before this code incorrectly reported
+            # failure, using a real OPAL account). `casda.authenticated()` reads the
+            # actual internal state `_login` sets and isn't affected by that bug.
+            casda.login(username=username)
         except Exception as exc:  # astroquery raises assorted exceptions on network/auth failure
             raise CutoutUnavailable(f"CASDA login failed: {exc}") from exc
-        if not authenticated:
+        if not casda.authenticated():
             raise CutoutUnavailable(
                 "CASDA login failed (bad credentials, or no password available -- "
                 "see README.md 'CASDA / RACS access')"
@@ -219,8 +230,19 @@ class RacsCasdaBackend(CutoutBackend):
             if not fits_files:
                 raise CutoutUnavailable("CASDA cutout download contained no FITS file")
             with fits.open(fits_files[0]) as hdul:
-                data = hdul[0].data.copy()
+                # RACS cutouts come back with degenerate Stokes/frequency axes, e.g.
+                # shape (1, 1, ny, nx) -- confirmed live 2026-07-30 against a real
+                # cutout. squeeze() drops any size-1 axis, leaving the 2D image plane
+                # every other backend already returns; if a future cutout genuinely
+                # has more than one Stokes/frequency plane, squeeze() leaves those
+                # axes alone and this raises rather than silently mis-plotting one.
+                data = hdul[0].data.copy().squeeze()
                 header = hdul[0].header.copy()
+
+        if data.ndim != 2:
+            raise CutoutUnavailable(
+                f"Expected a 2D cutout after squeezing degenerate axes, got shape {data.shape}"
+            )
 
         provenance = f"racs_casda:{subset['filename'][0]}"
         return CutoutResult(data=data, wcs=WCS(header).celestial, provenance=provenance)

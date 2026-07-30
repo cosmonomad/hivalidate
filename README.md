@@ -40,9 +40,23 @@ queries RACS via `astroquery.casda`, which requires an
 **Important, and not obvious from astroquery's docs:** `Casda.login()` only accepts a
 `username` -- there is no `password=` parameter. The password always comes from your
 OS keyring, or an interactive prompt if it isn't there yet. `hivalidate`'s
-`RacsCasdaBackend` was built around this, and was **not tested against a real CASDA
-account during development** (no credentials were available) -- verify it yourself
-before relying on it for a real batch run:
+`RacsCasdaBackend` was built around this, and has since been **verified live against
+a real OPAL account (2026-07-30)** -- login, RACS filtering, cutout request, and
+download all confirmed working end to end. That session also found and fixed two real
+bugs, both covered by regression tests now:
+
+- This environment's astroquery (0.4.11) has its own bug: `login()`'s return value is
+  always `None`/falsy regardless of outcome (it discards the real result internally).
+  `RacsCasdaBackend` checks `casda.authenticated()` instead, which isn't affected.
+  If you see astroquery's own log say "Authentication successful!" immediately
+  before `hivalidate-check-connectivity` reports `racs_casda` as failed, you're on an
+  astroquery version with the same bug and an older `hivalidate` that hadn't been
+  fixed yet -- update.
+- Real RACS cutouts come back with degenerate Stokes/frequency axes (shape
+  `(1, 1, ny, nx)`), not 2D like every other backend -- `fetch()` squeezes these down.
+
+Still worth doing a one-time check yourself on a new machine/account, since keyring
+behaviour is environment-specific (see below):
 
 ### Option A: one-time interactive login (simplest, if your keyring works)
 
@@ -55,8 +69,11 @@ export CASDA_USERNAME=you@example.com
 python3 -c "
 from astroquery.casda import Casda
 casda = Casda()
-ok = casda.login(username='$CASDA_USERNAME', store_password=True)
-print('login OK' if ok else 'login FAILED')
+casda.login(username='$CASDA_USERNAME', store_password=True)
+# Not 'casda.login(...) ' return value -- some astroquery versions (0.4.11,
+# confirmed) always return None/falsy there regardless of outcome. Check the real
+# state instead:
+print('login OK' if casda.authenticated() else 'login FAILED')
 "
 ```
 
@@ -67,7 +84,11 @@ for this option.
 
 If this raises something like `NoKeyringError`, your login node doesn't have a usable
 keyring backend (common on headless Linux systems with no desktop session) -- use
-Option B instead.
+Option B instead. If `login OK` prints but a later `security find-generic-password -s
+"astroquery:casda.csiro.au"` (macOS) or equivalent doesn't find an entry, double check
+you're running the same Python install everywhere (`python3 -c "import sys;
+print(sys.executable)"`) -- a different Python can mean a completely separate keyring
+configuration.
 
 ### Option B: `CASDA_PASSWORD` env var (works even with no system keyring)
 

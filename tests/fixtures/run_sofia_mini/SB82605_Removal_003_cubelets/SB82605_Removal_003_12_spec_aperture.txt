@@ -1,0 +1,82 @@
+# Integrated source spectrum
+# Creator: SoFiA 2.6.0 (29-Oct-2024)
+# Time:    Mon, 27 Jul 2026, 12:27:57
+#
+# Description of parameters:
+#
+# - chan    Spectral channel number (zero-based).
+#
+# - v_opt / v_rad / v_app
+#           Radial velocity corresponding to the channel number as
+#           described by the WCS information in the header. The suf-
+#           fix denotes optical, radio or apparent radial velocity,
+#           respectively.
+#
+# - freq    Frequency corresponding to the channel number as described
+#           by the WCS information in the header.
+#
+# - f_sum   Sum of flux density values of all spatial pixels covered
+#           by the source in that channel. If the unit is Jy, then
+#           the flux density has already been corrected for the solid
+#           angle of the beam. If instead the unit is Jy/beam, you
+#           will need to manually divide by the beam area which, for
+#           Gaussian beams, will be
+#
+#             pi * a * b / (4 * ln(2))
+#
+#           where a and b are the major and minor axis of the beam in
+#           units of pixels.
+#
+# - n_pix   Number of spatial pixels covered by the source in that
+#           channel. This can be used to determine the statistical
+#           uncertainty of the summed flux value. Again, this has
+#           not yet been corrected for any potential spatial correla-
+#           tion of pixels due to the beam solid angle.
+#
+# Note that a WCS-related column will only be present if WCS conversion
+# was explicitly requested when running the pipeline.
+#
+# Header rows:
+#   1 = column number
+#   2 = parameter name
+#   3 = parameter unit
+#
+#        1                 2                 3         4
+#     chan              freq             f_sum     n_pix
+#        -                Hz                Jy         -
+#
+       196     1.3130185e+09    -7.0319836e-03       221
+       197     1.3130370e+09     3.1119546e-03       221
+       198     1.3130556e+09     1.1659266e-02       221
+       199     1.3130741e+09     4.1903499e-03       221
+       200     1.3130926e+09     1.2322294e-03       221
+       201     1.3131111e+09    -2.4990595e-03       221
+       202     1.3131296e+09     4.3567031e-03       221
+       203     1.3131481e+09     9.0834247e-03       221
+       204     1.3131667e+09     1.8437187e-03       221
+       205     1.3131852e+09     2.8519131e-03       221
+       206     1.3132037e+09     9.2395554e-03       221
+       207     1.3132222e+09     1.3030027e-02       221
+       208     1.3132407e+09     6.8132396e-03       221
+       209     1.3132593e+09     4.8259466e-03       221
+       210     1.3132778e+09     2.8108888e-03       221
+       211     1.3132963e+09     1.0346454e-02       221
+       212     1.3133148e+09     8.8336850e-04       221
+       213     1.3133333e+09     6.4156666e-03       221
+       214     1.3133519e+09    -3.5773199e-03       221
+       215     1.3133704e+09     6.1433128e-03       221
+       216     1.3133889e+09     1.7852959e-03       221
+       217     1.3134074e+09     5.5084989e-03       221
+       218     1.3134259e+09     1.2489274e-02       221
+       219     1.3134444e+09     3.0255743e-04       221
+       220     1.3134630e+09     1.2052526e-02       221
+       221     1.3134815e+09     5.9441045e-03       221
+       222     1.3135000e+09     8.1312626e-03       221
+       223     1.3135185e+09     9.8386914e-03       221
+       224     1.3135370e+09     3.1016213e-03       221
+       225     1.3135556e+09     7.8479770e-03       221
+       226     1.3135741e+09     5.8527054e-03       221
+       227     1.3135926e+09     9.2896395e-03       221
+       228     1.3136111e+09     8.6796490e-04       221
+       229     1.3136296e+09     3.7214776e-03       221
+       230     1.3136481e+09     1.0377146e-03       221

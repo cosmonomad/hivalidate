@@ -1,0 +1,11 @@
+# Auto-flagging log file
+# Creator: SoFiA 2.6.0
+#
+# Flagging codes:
+#   C z            =  spectral channel (z)
+#   P x y          =  spatial pixel (x, y)
+#   R x1 x2 y1 y2  =  spatial region (x1:x2, y1:y2)
+# Note that coordinates will be relative to subregion
+# unless parameter.offset was set to true.
+
+C 221

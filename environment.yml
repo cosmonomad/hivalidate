@@ -1,0 +1,28 @@
+# Conda environment for hivalidate.
+#
+# Create with:   conda env create -f environment.yml
+# Update with:   conda env update -f environment.yml --prune
+#
+# MontagePy ships prebuilt wheels on PyPI (https://github.com/Caltech-IPAC/Montage)
+# but wheel availability varies by platform/Python version -- if the pip install step
+# fails on a new machine, check that a wheel exists for your Python/OS combination
+# before assuming something else is wrong.
+name: hivalidate
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - astropy>=6.0
+  - astroquery>=0.4.7
+  - reproject>=0.13
+  - matplotlib>=3.8
+  - numpy>=1.26
+  - requests>=2.31
+  - pyyaml>=6.0
+  - pytest>=8.0
+  - ruff>=0.6
+  - pre-commit>=3.7
+  - pip
+  - pip:
+      - MontagePy>=6.0
+      - -e .

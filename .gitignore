@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Virtual environments ---
+.venv/
+venv/
+
+# --- Editor / OS ---
+*.swp
+*.swo
+.DS_Store
+
+# --- Local tooling config (personal, not shared) ---
+.claude/settings.local.json
+
+# --- Project data (large, regenerated, or field-specific) ---
+# Real survey/catalogue data, cutout downloads, and pipeline outputs never belong in
+# git. tests/fixtures/ is the one deliberate exception (small, curated, versioned) --
+# see the negated rules below.
+/data/
+/output_validation*/
+/cutout_cache/
+*.fits
+*.png
+!tests/fixtures/**/*.fits
+!tests/fixtures/**/*.png
+!docs/**/*.png
+
+# --- Credentials ---
+# CASDA/OPAL login must never be committed. See README.md for how to configure it via
+# environment variables instead.
+*credentials*
+.casda_login

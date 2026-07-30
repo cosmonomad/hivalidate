@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # MontagePy needs a compatible prebuilt wheel for this runner; if this step
+      # starts failing after a GitHub-hosted runner image bump, check wheel
+      # availability for the new Python/OS combination first.
+      - name: Install package + dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check src tests
+
+      # Runs against tests/fixtures/ only. The full run_sofia/ end-to-end pass
+      # (PLAN.md Phase 6) is a separate, manually-triggered, network-dependent run.
+      - name: Test (pytest)
+        run: pytest -v

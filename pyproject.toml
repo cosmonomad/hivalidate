@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hivalidate"
+version = "0.1.0.dev0"
+description = "Validation pipeline for SoFiA HI source-finding output (DINGO/WALLABY-style ASKAP surveys)."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [
+    { name = "<COPYRIGHT HOLDER>" },
+]
+
+# Kept in sync with environment.yml. MontagePy ships prebuilt wheels but wheel
+# availability varies by platform/Python version -- see README.md for notes.
+dependencies = [
+    "astropy>=6.0",
+    "astroquery>=0.4.7",
+    "MontagePy>=6.0",
+    "reproject>=0.13",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "requests>=2.31",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "pre-commit>=3.7",
+]
+
+[project.scripts]
+hivalidate-combine = "hivalidate.cli.combine:main"
+hivalidate-dedup = "hivalidate.cli.dedup:main"
+hivalidate-rename = "hivalidate.cli.rename:main"
+hivalidate-dry-run = "hivalidate.cli.dry_run:main"
+hivalidate-qa = "hivalidate.cli.qa:main"
+hivalidate-postprocess = "hivalidate.cli.postprocess:main"
+hivalidate-check-connectivity = "hivalidate.cli.check_connectivity:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]

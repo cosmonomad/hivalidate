@@ -1,0 +1,86 @@
+# Integrated source spectrum
+# Creator: SoFiA 2.6.0 (29-Oct-2024)
+# Time:    Mon, 27 Jul 2026, 12:29:01
+#
+# Description of parameters:
+#
+# - chan    Spectral channel number (zero-based).
+#
+# - v_opt / v_rad / v_app
+#           Radial velocity corresponding to the channel number as
+#           described by the WCS information in the header. The suf-
+#           fix denotes optical, radio or apparent radial velocity,
+#           respectively.
+#
+# - freq    Frequency corresponding to the channel number as described
+#           by the WCS information in the header.
+#
+# - f_sum   Sum of flux density values of all spatial pixels covered
+#           by the source in that channel. If the unit is Jy, then
+#           the flux density has already been corrected for the solid
+#           angle of the beam. If instead the unit is Jy/beam, you
+#           will need to manually divide by the beam area which, for
+#           Gaussian beams, will be
+#
+#             pi * a * b / (4 * ln(2))
+#
+#           where a and b are the major and minor axis of the beam in
+#           units of pixels.
+#
+# - n_pix   Number of spatial pixels covered by the source in that
+#           channel. This can be used to determine the statistical
+#           uncertainty of the summed flux value. Again, this has
+#           not yet been corrected for any potential spatial correla-
+#           tion of pixels due to the beam solid angle.
+#
+# Note that a WCS-related column will only be present if WCS conversion
+# was explicitly requested when running the pipeline.
+#
+# Header rows:
+#   1 = column number
+#   2 = parameter name
+#   3 = parameter unit
+#
+#        1                 2                 3         4
+#     chan              freq             f_sum     n_pix
+#        -                Hz                Jy         -
+#
+       856     1.3459259e+09    -6.2828904e-03       157
+       857     1.3459444e+09     3.3987080e-04       157
+       858     1.3459630e+09    -1.7088336e-03       157
+       859     1.3459815e+09     6.5586572e-03       157
+       860     1.3460000e+09     5.3151680e-03       157
+       861     1.3460185e+09     4.9181679e-03       157
+       862     1.3460370e+09     1.7670528e-03       157
+       863     1.3460556e+09     3.1489121e-03       157
+       864     1.3460741e+09    -2.3936675e-03       157
+       865     1.3460926e+09    -5.8378019e-03       157
+       866     1.3461111e+09     2.6995137e-03       157
+       867     1.3461296e+09     8.1426022e-03       157
+       868     1.3461481e+09     1.2275107e-03       157
+       869     1.3461667e+09    -5.6384048e-04       157
+       870     1.3461852e+09     7.3049814e-03       157
+       871     1.3462037e+09     2.4448382e-03       157
+       872     1.3462222e+09     6.9066235e-04       157
+       873     1.3462407e+09     1.6951366e-03       157
+       874     1.3462593e+09     4.1909892e-03       157
+       875     1.3462778e+09     4.8759215e-03       157
+       876     1.3462963e+09     3.9630572e-03       157
+       877     1.3463148e+09     1.2854606e-03       157
+       878     1.3463333e+09     1.4539689e-03       157
+       879     1.3463519e+09     1.3298468e-02       157
+       880     1.3463704e+09     7.1312837e-03       157
+       881     1.3463889e+09     6.9469213e-03       157
+       882     1.3464074e+09     5.6780925e-03       157
+       883     1.3464259e+09     1.9988129e-03       157
+       884     1.3464444e+09    -3.9589002e-03       157
+       885     1.3464630e+09     1.2657191e-02       157
+       886     1.3464815e+09    -1.6509039e-03       157
+       887     1.3465000e+09     9.2535174e-03       157
+       888     1.3465185e+09     4.1099655e-03       157
+       889     1.3465370e+09     1.8404714e-03       157
+       890     1.3465556e+09    -3.4221624e-03       157
+       891     1.3465741e+09     6.4358172e-03       157
+       892     1.3465926e+09    -2.7119793e-03       157
+       893     1.3466111e+09    -4.4570843e-04       157
+       894     1.3466296e+09     6.9797040e-03       157

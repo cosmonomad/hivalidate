@@ -1,0 +1,15 @@
+# Config pointing at the small tests/fixtures/run_sofia_mini/ dataset (3 real runs)
+# used by fast unit/integration tests. Mirrors configs/SB82605.yaml's structure.
+
+field_name: SB82605_mini
+
+paths:
+  raw_sofia_dir: run_sofia_mini
+  work_dir: work
+  continuum_local_dir: null
+  gama_catalogue: null
+
+dedup:
+  sep_arcsec: 30.0
+  vel_tol_base_km_s: 30.0
+  vel_tol_wm50_factor: 0.6

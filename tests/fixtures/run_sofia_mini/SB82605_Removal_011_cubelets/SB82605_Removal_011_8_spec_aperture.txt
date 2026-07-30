@@ -1,0 +1,76 @@
+# Integrated source spectrum
+# Creator: SoFiA 2.6.0 (29-Oct-2024)
+# Time:    Mon, 27 Jul 2026, 12:38:16
+#
+# Description of parameters:
+#
+# - chan    Spectral channel number (zero-based).
+#
+# - v_opt / v_rad / v_app
+#           Radial velocity corresponding to the channel number as
+#           described by the WCS information in the header. The suf-
+#           fix denotes optical, radio or apparent radial velocity,
+#           respectively.
+#
+# - freq    Frequency corresponding to the channel number as described
+#           by the WCS information in the header.
+#
+# - f_sum   Sum of flux density values of all spatial pixels covered
+#           by the source in that channel. If the unit is Jy, then
+#           the flux density has already been corrected for the solid
+#           angle of the beam. If instead the unit is Jy/beam, you
+#           will need to manually divide by the beam area which, for
+#           Gaussian beams, will be
+#
+#             pi * a * b / (4 * ln(2))
+#
+#           where a and b are the major and minor axis of the beam in
+#           units of pixels.
+#
+# - n_pix   Number of spatial pixels covered by the source in that
+#           channel. This can be used to determine the statistical
+#           uncertainty of the summed flux value. Again, this has
+#           not yet been corrected for any potential spatial correla-
+#           tion of pixels due to the beam solid angle.
+#
+# Note that a WCS-related column will only be present if WCS conversion
+# was explicitly requested when running the pipeline.
+#
+# Header rows:
+#   1 = column number
+#   2 = parameter name
+#   3 = parameter unit
+#
+#        1                 2                 3         4
+#     chan              freq             f_sum     n_pix
+#        -                Hz                Jy         -
+#
+       719     1.3433889e+09    -6.0803385e-03       146
+       720     1.3434074e+09     2.7327835e-03       146
+       721     1.3434259e+09    -1.5138674e-03       146
+       722     1.3434444e+09    -8.7460792e-04       146
+       723     1.3434630e+09     3.1210783e-03       146
+       724     1.3434815e+09     6.0828453e-03       146
+       725     1.3435000e+09     3.3930020e-03       146
+       726     1.3435185e+09     3.9301770e-03       146
+       727     1.3435370e+09     1.4615129e-03       146
+       728     1.3435556e+09     2.5517242e-03       146
+       729     1.3435741e+09     4.5339615e-03       146
+       730     1.3435926e+09     5.1689063e-03       146
+       731     1.3436111e+09     3.2606707e-03       146
+       732     1.3436296e+09     1.0765994e-02       146
+       733     1.3436481e+09     1.2839592e-02       146
+       734     1.3436667e+09     5.2547689e-03       146
+       735     1.3436852e+09     1.2584804e-02       146
+       736     1.3437037e+09     1.0738690e-03       146
+       737     1.3437222e+09     4.1696479e-03       146
+       738     1.3437407e+09     5.2588417e-03       146
+       739     1.3437593e+09     9.3337149e-04       146
+       740     1.3437778e+09    -5.8868972e-03       146
+       741     1.3437963e+09     1.4463479e-03       146
+       742     1.3438148e+09     2.6499985e-03       146
+       743     1.3438333e+09     3.2764990e-03       146
+       744     1.3438519e+09     2.3341899e-03       146
+       745     1.3438704e+09    -2.5309153e-03       146
+       746     1.3438889e+09    -2.2416518e-03       146
+       747     1.3439074e+09     2.7887151e-03       146

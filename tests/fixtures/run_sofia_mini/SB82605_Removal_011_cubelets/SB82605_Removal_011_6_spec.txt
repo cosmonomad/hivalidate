@@ -1,0 +1,88 @@
+# Integrated source spectrum
+# Creator: SoFiA 2.6.0 (29-Oct-2024)
+# Time:    Mon, 27 Jul 2026, 12:38:16
+#
+# Description of parameters:
+#
+# - chan    Spectral channel number (zero-based).
+#
+# - v_opt / v_rad / v_app
+#           Radial velocity corresponding to the channel number as
+#           described by the WCS information in the header. The suf-
+#           fix denotes optical, radio or apparent radial velocity,
+#           respectively.
+#
+# - freq    Frequency corresponding to the channel number as described
+#           by the WCS information in the header.
+#
+# - f_sum   Sum of flux density values of all spatial pixels covered
+#           by the source in that channel. If the unit is Jy, then
+#           the flux density has already been corrected for the solid
+#           angle of the beam. If instead the unit is Jy/beam, you
+#           will need to manually divide by the beam area which, for
+#           Gaussian beams, will be
+#
+#             pi * a * b / (4 * ln(2))
+#
+#           where a and b are the major and minor axis of the beam in
+#           units of pixels.
+#
+# - n_pix   Number of spatial pixels covered by the source in that
+#           channel. This can be used to determine the statistical
+#           uncertainty of the summed flux value. Again, this has
+#           not yet been corrected for any potential spatial correla-
+#           tion of pixels due to the beam solid angle.
+#
+# Note that a WCS-related column will only be present if WCS conversion
+# was explicitly requested when running the pipeline.
+#
+# Header rows:
+#   1 = column number
+#   2 = parameter name
+#   3 = parameter unit
+#
+#        1                 2                 3         4
+#     chan              freq             f_sum     n_pix
+#        -                Hz                Jy         -
+#
+       903     1.3467963e+09     0.0000000e+00         0
+       904     1.3468148e+09     0.0000000e+00         0
+       905     1.3468333e+09     0.0000000e+00         0
+       906     1.3468519e+09     0.0000000e+00         0
+       907     1.3468704e+09     0.0000000e+00         0
+       908     1.3468889e+09     0.0000000e+00         0
+       909     1.3469074e+09     0.0000000e+00         0
+       910     1.3469259e+09     0.0000000e+00         0
+       911     1.3469444e+09     0.0000000e+00         0
+       912     1.3469630e+09     0.0000000e+00         0
+       913     1.3469815e+09     2.8408548e-04         4
+       914     1.3470000e+09    -9.4748985e-04        23
+       915     1.3470185e+09     2.6337307e-03        24
+       916     1.3470370e+09     3.8175379e-03        55
+       917     1.3470556e+09     3.0088249e-03        81
+       918     1.3470741e+09     8.1757796e-03       120
+       919     1.3470926e+09     9.4929213e-03       134
+       920     1.3471111e+09     1.6949042e-02       124
+       921     1.3471296e+09     9.5116448e-03       130
+       922     1.3471481e+09     9.8441941e-03       145
+       923     1.3471667e+09     1.0012616e-02       123
+       924     1.3471852e+09     6.4340858e-03        83
+       925     1.3472037e+09     3.4191862e-03        79
+       926     1.3472222e+09    -9.5003577e-04        54
+       927     1.3472407e+09    -4.0044099e-04        22
+       928     1.3472593e+09    -1.4091854e-03        35
+       929     1.3472778e+09     3.1702533e-03        31
+       930     1.3472963e+09    -1.0902601e-03        46
+       931     1.3473148e+09     3.1023571e-04        13
+       932     1.3473333e+09     0.0000000e+00         0
+       933     1.3473519e+09     4.9539496e-04         2
+       934     1.3473704e+09     0.0000000e+00         0
+       935     1.3473889e+09     0.0000000e+00         0
+       936     1.3474074e+09     0.0000000e+00         0
+       937     1.3474259e+09     0.0000000e+00         0
+       938     1.3474444e+09     0.0000000e+00         0
+       939     1.3474630e+09     0.0000000e+00         0
+       940     1.3474815e+09     0.0000000e+00         0
+       941     1.3475000e+09     0.0000000e+00         0
+       942     1.3475185e+09     0.0000000e+00         0
+       943     1.3475370e+09     0.0000000e+00         0

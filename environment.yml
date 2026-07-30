@@ -24,5 +24,5 @@ dependencies:
   - pre-commit>=3.7
   - pip
   - pip:
-      - MontagePy>=6.0
+      - MontagePy>=2.3
       - -e .

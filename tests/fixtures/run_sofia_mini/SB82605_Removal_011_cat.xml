@@ -1,0 +1,612 @@
+<?xml version="1.0" ?>
+<VOTABLE version="1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.ivoa.net/xml/VOTable/v1.3">
+	<RESOURCE>
+		<DESCRIPTION>Source catalogue created by the Source Finding Application (SoFiA 2.6.0)</DESCRIPTION>
+		<PARAM name="Time" datatype="char" arraysize="*" value="Mon, 27 Jul 2026, 12:38:26" ucd="time.creation"/>
+		<PARAM name="Creator" datatype="char" arraysize="*" value="SoFiA 2.6.0 (29-Oct-2024)" ucd="meta.id;meta.software"/>
+		<PARAM name="pipeline.verbose" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="pipeline.pedantic" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="pipeline.threads" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="input.data" datatype="char" arraysize="*" value="/scratch/askaprt/askapops/science-processing/82605-full-sunRemoval-v2/image.restored.i.WALLABY_2051-53B.SB82605.cube.contsub.fits" ucd="meta.note"/>
+		<PARAM name="input.region" datatype="char" arraysize="*" value="1326,2826,300,1800,1867,3267" ucd="meta.note"/>
+		<PARAM name="input.gain" datatype="char" arraysize="*" value="" ucd="meta.note"/>
+		<PARAM name="input.noise" datatype="char" arraysize="*" value="" ucd="meta.note"/>
+		<PARAM name="input.weights" datatype="char" arraysize="*" value="/scratch/askaprt/askapops/science-processing/82605-full-sunRemoval-v2/weights.i.WALLABY_2051-53B.SB82605.cube.fits" ucd="meta.note"/>
+		<PARAM name="input.primaryBeam" datatype="char" arraysize="*" value="" ucd="meta.note"/>
+		<PARAM name="input.mask" datatype="char" arraysize="*" value="" ucd="meta.note"/>
+		<PARAM name="input.invert" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="flag.region" datatype="char" arraysize="*" value="" ucd="meta.note"/>
+		<PARAM name="flag.cube" datatype="char" arraysize="*" value="" ucd="meta.note"/>
+		<PARAM name="flag.catalog" datatype="char" arraysize="*" value="/software/projects/ja3/ashen/config/wallaby/racs_gt_150mJy_south.dat" ucd="meta.note"/>
+		<PARAM name="flag.radius" datatype="char" arraysize="*" value="5" ucd="meta.note"/>
+		<PARAM name="flag.auto" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="flag.threshold" datatype="char" arraysize="*" value="7" ucd="meta.note"/>
+		<PARAM name="flag.log" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="contsub.enable" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="contsub.order" datatype="char" arraysize="*" value="1" ucd="meta.note"/>
+		<PARAM name="contsub.threshold" datatype="char" arraysize="*" value="2.0" ucd="meta.note"/>
+		<PARAM name="contsub.shift" datatype="char" arraysize="*" value="5" ucd="meta.note"/>
+		<PARAM name="contsub.padding" datatype="char" arraysize="*" value="5" ucd="meta.note"/>
+		<PARAM name="scaleNoise.enable" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="scaleNoise.mode" datatype="char" arraysize="*" value="local" ucd="meta.note"/>
+		<PARAM name="scaleNoise.statistic" datatype="char" arraysize="*" value="mad" ucd="meta.note"/>
+		<PARAM name="scaleNoise.fluxRange" datatype="char" arraysize="*" value="negative" ucd="meta.note"/>
+		<PARAM name="scaleNoise.windowXY" datatype="char" arraysize="*" value="51" ucd="meta.note"/>
+		<PARAM name="scaleNoise.windowZ" datatype="char" arraysize="*" value="51" ucd="meta.note"/>
+		<PARAM name="scaleNoise.gridXY" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="scaleNoise.gridZ" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="scaleNoise.interpolate" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="scaleNoise.scfind" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="rippleFilter.enable" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="rippleFilter.statistic" datatype="char" arraysize="*" value="median" ucd="meta.note"/>
+		<PARAM name="rippleFilter.windowXY" datatype="char" arraysize="*" value="75" ucd="meta.note"/>
+		<PARAM name="rippleFilter.windowZ" datatype="char" arraysize="*" value="75" ucd="meta.note"/>
+		<PARAM name="rippleFilter.gridXY" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="rippleFilter.gridZ" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="rippleFilter.interpolate" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="scfind.enable" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="scfind.kernelsXY" datatype="char" arraysize="*" value="0, 5, 10" ucd="meta.note"/>
+		<PARAM name="scfind.kernelsZ" datatype="char" arraysize="*" value="0, 3, 7, 15, 31" ucd="meta.note"/>
+		<PARAM name="scfind.threshold" datatype="char" arraysize="*" value="3.8" ucd="meta.note"/>
+		<PARAM name="scfind.replacement" datatype="char" arraysize="*" value="2.0" ucd="meta.note"/>
+		<PARAM name="scfind.statistic" datatype="char" arraysize="*" value="mad" ucd="meta.note"/>
+		<PARAM name="scfind.fluxRange" datatype="char" arraysize="*" value="negative" ucd="meta.note"/>
+		<PARAM name="threshold.enable" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="threshold.threshold" datatype="char" arraysize="*" value="5" ucd="meta.note"/>
+		<PARAM name="threshold.mode" datatype="char" arraysize="*" value="relative" ucd="meta.note"/>
+		<PARAM name="threshold.statistic" datatype="char" arraysize="*" value="mad" ucd="meta.note"/>
+		<PARAM name="threshold.fluxRange" datatype="char" arraysize="*" value="negative" ucd="meta.note"/>
+		<PARAM name="linker.enable" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="linker.radiusXY" datatype="char" arraysize="*" value="2" ucd="meta.note"/>
+		<PARAM name="linker.radiusZ" datatype="char" arraysize="*" value="3" ucd="meta.note"/>
+		<PARAM name="linker.minSizeXY" datatype="char" arraysize="*" value="5" ucd="meta.note"/>
+		<PARAM name="linker.minSizeZ" datatype="char" arraysize="*" value="5" ucd="meta.note"/>
+		<PARAM name="linker.maxSizeXY" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="linker.maxSizeZ" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="linker.minPixels" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="linker.maxPixels" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="linker.minFill" datatype="char" arraysize="*" value="0.0" ucd="meta.note"/>
+		<PARAM name="linker.maxFill" datatype="char" arraysize="*" value="0.0" ucd="meta.note"/>
+		<PARAM name="linker.positivity" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="linker.keepNegative" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="reliability.enable" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="reliability.parameters" datatype="char" arraysize="*" value="peak, sum, mean" ucd="meta.note"/>
+		<PARAM name="reliability.threshold" datatype="char" arraysize="*" value="0.7" ucd="meta.note"/>
+		<PARAM name="reliability.scaleKernel" datatype="char" arraysize="*" value="0.2" ucd="meta.note"/>
+		<PARAM name="reliability.minSNR" datatype="char" arraysize="*" value="3.0" ucd="meta.note"/>
+		<PARAM name="reliability.minPixels" datatype="char" arraysize="*" value="0" ucd="meta.note"/>
+		<PARAM name="reliability.autoKernel" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="reliability.iterations" datatype="char" arraysize="*" value="30" ucd="meta.note"/>
+		<PARAM name="reliability.tolerance" datatype="char" arraysize="*" value="0.05" ucd="meta.note"/>
+		<PARAM name="reliability.catalog" datatype="char" arraysize="*" value="" ucd="meta.note"/>
+		<PARAM name="reliability.plot" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="reliability.plotExtra" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="reliability.debug" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="dilation.enable" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="dilation.iterationsXY" datatype="char" arraysize="*" value="10" ucd="meta.note"/>
+		<PARAM name="dilation.iterationsZ" datatype="char" arraysize="*" value="5" ucd="meta.note"/>
+		<PARAM name="dilation.threshold" datatype="char" arraysize="*" value="0.001" ucd="meta.note"/>
+		<PARAM name="parameter.enable" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="parameter.wcs" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="parameter.physical" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="parameter.prefix" datatype="char" arraysize="*" value="SoFiA" ucd="meta.note"/>
+		<PARAM name="parameter.offset" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="output.directory" datatype="char" arraysize="*" value="/scratch/ja3/jrhee/WALLABY/sourceFinding/output/quality/SB82605_Removal/sofia/output" ucd="meta.note"/>
+		<PARAM name="output.filename" datatype="char" arraysize="*" value="SB82605_Removal_011" ucd="meta.note"/>
+		<PARAM name="output.writeCatASCII" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="output.writeCatXML" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="output.writeCatSQL" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="output.writeNoise" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="output.writeFiltered" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="output.writeMask" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="output.writeMask2d" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="output.writeRawMask" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="output.writeMoments" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="output.writeCubelets" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="output.writePV" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<PARAM name="output.writeKarma" datatype="char" arraysize="*" value="false" ucd="meta.note"/>
+		<PARAM name="output.marginCubelets" datatype="char" arraysize="*" value="10" ucd="meta.note"/>
+		<PARAM name="output.marginAperSpec" datatype="char" arraysize="*" value="10" ucd="meta.note"/>
+		<PARAM name="output.thresholdMom12" datatype="char" arraysize="*" value="0.0" ucd="meta.note"/>
+		<PARAM name="output.overwrite" datatype="char" arraysize="*" value="true" ucd="meta.note"/>
+		<TABLE ID="SoFiA_source_catalogue" name="SoFiA source catalogue">
+			<FIELD arraysize="32" datatype="char" name="name" unit="" ucd="meta.id"/>
+			<FIELD datatype="long" name="id" unit="" ucd="meta.id"/>
+			<FIELD datatype="double" name="x" unit="pix" ucd="pos.cartesian.x"/>
+			<FIELD datatype="double" name="y" unit="pix" ucd="pos.cartesian.y"/>
+			<FIELD datatype="double" name="z" unit="pix" ucd="pos.cartesian.z"/>
+			<FIELD datatype="long" name="x_min" unit="pix" ucd="pos.cartesian.x;stat.min"/>
+			<FIELD datatype="long" name="x_max" unit="pix" ucd="pos.cartesian.x;stat.max"/>
+			<FIELD datatype="long" name="y_min" unit="pix" ucd="pos.cartesian.y;stat.min"/>
+			<FIELD datatype="long" name="y_max" unit="pix" ucd="pos.cartesian.y;stat.max"/>
+			<FIELD datatype="long" name="z_min" unit="pix" ucd="pos.cartesian.z;stat.min"/>
+			<FIELD datatype="long" name="z_max" unit="pix" ucd="pos.cartesian.z;stat.max"/>
+			<FIELD datatype="long" name="n_pix" unit="" ucd="meta.number;instr.pixel"/>
+			<FIELD datatype="double" name="f_min" unit="Jy/beam" ucd="phot.flux.density;stat.min"/>
+			<FIELD datatype="double" name="f_max" unit="Jy/beam" ucd="phot.flux.density;stat.max"/>
+			<FIELD datatype="double" name="f_sum" unit="Jy*Hz" ucd="phot.flux"/>
+			<FIELD datatype="double" name="rel" unit="" ucd="stat.probability"/>
+			<FIELD datatype="long" name="flag" unit="" ucd="meta.code.qual"/>
+			<FIELD datatype="double" name="rms" unit="Jy/beam" ucd="instr.det.noise"/>
+			<FIELD datatype="double" name="w20" unit="Hz" ucd="spect.line.width"/>
+			<FIELD datatype="double" name="w50" unit="Hz" ucd="spect.line.width"/>
+			<FIELD datatype="double" name="wm50" unit="Hz" ucd="spect.line.width"/>
+			<FIELD datatype="double" name="ell_maj" unit="pix" ucd="phys.angSize"/>
+			<FIELD datatype="double" name="ell_min" unit="pix" ucd="phys.angSize"/>
+			<FIELD datatype="double" name="ell_pa" unit="deg" ucd="pos.posAng"/>
+			<FIELD datatype="double" name="ell3s_maj" unit="pix" ucd="phys.angSize"/>
+			<FIELD datatype="double" name="ell3s_min" unit="pix" ucd="phys.angSize"/>
+			<FIELD datatype="double" name="ell3s_pa" unit="deg" ucd="pos.posAng"/>
+			<FIELD datatype="double" name="kin_pa" unit="deg" ucd="pos.posAng"/>
+			<FIELD datatype="double" name="err_x" unit="pix" ucd="stat.error;pos.cartesian.x"/>
+			<FIELD datatype="double" name="err_y" unit="pix" ucd="stat.error;pos.cartesian.y"/>
+			<FIELD datatype="double" name="err_z" unit="pix" ucd="stat.error;pos.cartesian.z"/>
+			<FIELD datatype="double" name="err_f_sum" unit="Jy*Hz" ucd="stat.error;phot.flux"/>
+			<FIELD datatype="double" name="snr" unit="" ucd="stat.snr"/>
+			<FIELD datatype="double" name="snr_max" unit="" ucd="stat.snr"/>
+			<FIELD datatype="double" name="ra" unit="deg" ucd="pos.eq.ra"/>
+			<FIELD datatype="double" name="dec" unit="deg" ucd="pos.eq.dec"/>
+			<FIELD datatype="double" name="freq" unit="Hz" ucd="em.freq"/>
+			<FIELD datatype="long" name="x_peak" unit="pix" ucd="pos.cartesian.x"/>
+			<FIELD datatype="long" name="y_peak" unit="pix" ucd="pos.cartesian.y"/>
+			<FIELD datatype="long" name="z_peak" unit="pix" ucd="pos.cartesian.z"/>
+			<FIELD datatype="double" name="ra_peak" unit="deg" ucd="pos.eq.ra"/>
+			<FIELD datatype="double" name="dec_peak" unit="deg" ucd="pos.eq.dec"/>
+			<FIELD datatype="double" name="freq_peak" unit="Hz" ucd="em.freq"/>
+			<DATA>
+				<TABLEDATA>
+					<TR>
+						<TD>SoFiA J204847.94-550810.2</TD>
+						<TD>1</TD>
+						<TD>1.078849848195905e+03</TD>
+						<TD>1.042229660245699e+03</TD>
+						<TD>1.308971508752276e+03</TD>
+						<TD>1075</TD>
+						<TD>1083</TD>
+						<TD>1038</TD>
+						<TD>1045</TD>
+						<TD>1306</TD>
+						<TD>1312</TD>
+						<TD>108</TD>
+						<TD>-2.011437667533755e-03</TD>
+						<TD>1.397637836635113e-02</TD>
+						<TD>2.967462172098656e+02</TD>
+						<TD>8.521350628120070e-01</TD>
+						<TD>0</TD>
+						<TD>3.231916219444267e-03</TD>
+						<TD>8.610176201426258e+04</TD>
+						<TD>3.064720061594261e+04</TD>
+						<TD>1.111111111110000e+05</TD>
+						<TD>3.860309763566242e+00</TD>
+						<TD>3.508191103933305e+00</TD>
+						<TD>5.978437274679342e+01</TD>
+						<TD>4.835676298675653e+00</TD>
+						<TD>2.646899935530867e+00</TD>
+						<TD>6.194224895894369e+01</TD>
+						<TD>-1.000000000000000e+00</TD>
+						<TD>7.190275510702676e-01</TD>
+						<TD>6.654311991369645e-01</TD>
+						<TD>6.625339167571983e-01</TD>
+						<TD>1.172055829631865e+02</TD>
+						<TD>2.531843703239561e+00</TD>
+						<TD>2.866965069707490e+00</TD>
+						<TD>3.121997422014356e+02</TD>
+						<TD>-5.513617893467782e+01</TD>
+						<TD>1.354314287199057e+09</TD>
+						<TD>1080</TD>
+						<TD>1042</TD>
+						<TD>1309</TD>
+						<TD>3.121963754032303e+02</TD>
+						<TD>-5.513652298002106e+01</TD>
+						<TD>1.354314814814756e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J204928.72-551214.6</TD>
+						<TD>2</TD>
+						<TD>1.019856462943375e+03</TD>
+						<TD>1.002613445567194e+03</TD>
+						<TD>1.232969482508581e+03</TD>
+						<TD>1007</TD>
+						<TD>1031</TD>
+						<TD>993</TD>
+						<TD>1014</TD>
+						<TD>1215</TD>
+						<TD>1252</TD>
+						<TD>7872</TD>
+						<TD>-1.093563903123140e-02</TD>
+						<TD>1.011958718299866e-02</TD>
+						<TD>3.788896426371149e+03</TD>
+						<TD>9.999391828399115e-01</TD>
+						<TD>0</TD>
+						<TD>2.360072163805673e-03</TD>
+						<TD>3.551798046353640e+05</TD>
+						<TD>3.279082458750856e+05</TD>
+						<TD>3.472583370956606e+05</TD>
+						<TD>9.968168201430629e+00</TD>
+						<TD>8.325999512746105e+00</TD>
+						<TD>8.596588676844846e+01</TD>
+						<TD>1.430148386805637e+01</TD>
+						<TD>3.319318107335775e+00</TD>
+						<TD>8.342106931727952e+01</TD>
+						<TD>8.160091323476439e+01</TD>
+						<TD>3.896703231420909e-01</TD>
+						<TD>3.521789835764914e-01</TD>
+						<TD>6.083517348897488e-01</TD>
+						<TD>7.307084889948065e+02</TD>
+						<TD>5.185236634630201e+00</TD>
+						<TD>1.406788232692192e+01</TD>
+						<TD>3.123696566461736e+02</TD>
+						<TD>-5.520406929117150e+01</TD>
+						<TD>1.352906842268620e+09</TD>
+						<TD>1016</TD>
+						<TD>1004</TD>
+						<TD>1232</TD>
+						<TD>3.123809912610126e+02</TD>
+						<TD>-5.520187198179521e+01</TD>
+						<TD>1.352888888888832e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J204524.82-550222.5</TD>
+						<TD>3</TD>
+						<TD>1.370850694283181e+03</TD>
+						<TD>1.092559345311935e+03</TD>
+						<TD>1.199963870499153e+03</TD>
+						<TD>1368</TD>
+						<TD>1376</TD>
+						<TD>1084</TD>
+						<TD>1096</TD>
+						<TD>1195</TD>
+						<TD>1205</TD>
+						<TD>243</TD>
+						<TD>-3.173515666276217e-03</TD>
+						<TD>1.056300010532141e-02</TD>
+						<TD>5.256754511340451e+02</TD>
+						<TD>7.620733970993363e-01</TD>
+						<TD>0</TD>
+						<TD>2.298976578050140e-03</TD>
+						<TD>1.489301268757739e+05</TD>
+						<TD>1.294730672065231e+05</TD>
+						<TD>1.436789511749821e+05</TD>
+						<TD>4.968406663588411e+00</TD>
+						<TD>2.657266298823530e+00</TD>
+						<TD>3.120301633458496e+01</TD>
+						<TD>2.913558918106347e+00</TD>
+						<TD>2.587172427911661e+00</TD>
+						<TD>1.734649455558269e+01</TD>
+						<TD>3.595853163026394e+02</TD>
+						<TD>3.993113941008168e-01</TD>
+						<TD>5.354183022882925e-01</TD>
+						<TD>5.198226995216635e-01</TD>
+						<TD>1.250587291347288e+02</TD>
+						<TD>4.203428699229161e+00</TD>
+						<TD>4.956211190870550e+00</TD>
+						<TD>3.113534147190400e+02</TD>
+						<TD>-5.503958481006873e+01</TD>
+						<TD>1.352295627231409e+09</TD>
+						<TD>1371</TD>
+						<TD>1093</TD>
+						<TD>1203</TD>
+						<TD>3.113530222196264e+02</TD>
+						<TD>-5.503884268026187e+01</TD>
+						<TD>1.352351851851795e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J204526.42-553001.5</TD>
+						<TD>4</TD>
+						<TD>1.359582476193446e+03</TD>
+						<TD>8.163320677131715e+02</TD>
+						<TD>1.167216510587787e+03</TD>
+						<TD>1354</TD>
+						<TD>1365</TD>
+						<TD>810</TD>
+						<TD>821</TD>
+						<TD>1140</TD>
+						<TD>1199</TD>
+						<TD>2788</TD>
+						<TD>-5.354850087314844e-03</TD>
+						<TD>7.326873019337654e-03</TD>
+						<TD>2.224789989114721e+03</TD>
+						<TD>8.976458251899735e-01</TD>
+						<TD>0</TD>
+						<TD>2.172253856172774e-03</TD>
+						<TD>8.464179482930762e+05</TD>
+						<TD>7.288632615718509e+05</TD>
+						<TD>8.484849646654419e+05</TD>
+						<TD>4.658673662544591e+00</TD>
+						<TD>3.848559392198305e+00</TD>
+						<TD>-6.666791010633213e+01</TD>
+						<TD>4.441852406606378e+00</TD>
+						<TD>3.027407910185087e+00</TD>
+						<TD>-7.898736119021264e+01</TD>
+						<TD>2.547637278749162e+02</TD>
+						<TD>2.819013826619596e-01</TD>
+						<TD>2.640594083518261e-01</TD>
+						<TD>1.501692621376450e+00</TD>
+						<TD>4.002517957361288e+02</TD>
+						<TD>5.558475971414361e+00</TD>
+						<TD>9.449728653406892e+00</TD>
+						<TD>3.113600715723003e+02</TD>
+						<TD>-5.550041722593526e+01</TD>
+						<TD>1.351689194640458e+09</TD>
+						<TD>1361</TD>
+						<TD>816</TD>
+						<TD>1153</TD>
+						<TD>3.113558696212672e+02</TD>
+						<TD>-5.550089475462333e+01</TD>
+						<TD>1.351425925925870e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J204646.69-544407.4</TD>
+						<TD>5</TD>
+						<TD>1.258684527812683e+03</TD>
+						<TD>1.278470331743794e+03</TD>
+						<TD>1.055478078493578e+03</TD>
+						<TD>1252</TD>
+						<TD>1264</TD>
+						<TD>1271</TD>
+						<TD>1289</TD>
+						<TD>1039</TD>
+						<TD>1079</TD>
+						<TD>1728</TD>
+						<TD>-5.863568279892206e-03</TD>
+						<TD>9.756406769156456e-03</TD>
+						<TD>1.367272707777929e+03</TD>
+						<TD>8.058120949285287e-01</TD>
+						<TD>0</TD>
+						<TD>2.269516150143148e-03</TD>
+						<TD>6.633412809180644e+05</TD>
+						<TD>3.952747893534955e+05</TD>
+						<TD>6.990491761953118e+05</TD>
+						<TD>6.199776171368423e+00</TD>
+						<TD>4.083938458304152e+00</TD>
+						<TD>-4.076533011355442e+01</TD>
+						<TD>7.082609928437477e+00</TD>
+						<TD>3.406329576003002e+00</TD>
+						<TD>-1.925602795994619e+01</TD>
+						<TD>2.459707449923877e+01</TD>
+						<TD>3.696607462735496e-01</TD>
+						<TD>3.954154974157018e-01</TD>
+						<TD>1.318889994699208e+00</TD>
+						<TD>3.292164095363009e+02</TD>
+						<TD>4.153112263461361e+00</TD>
+						<TD>7.421044258745574e+00</TD>
+						<TD>3.116945228731242e+02</TD>
+						<TD>-5.473540004788244e+01</TD>
+						<TD>1.349619964416494e+09</TD>
+						<TD>1258</TD>
+						<TD>1277</TD>
+						<TD>1049</TD>
+						<TD>3.116963818877705e+02</TD>
+						<TD>-5.473788095765070e+01</TD>
+						<TD>1.349499999999946e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J205311.41-563353.9</TD>
+						<TD>6</TD>
+						<TD>6.983281131721446e+02</TD>
+						<TD>1.900418888378838e+02</TD>
+						<TD>9.211373524404669e+02</TD>
+						<TD>693</TD>
+						<TD>704</TD>
+						<TD>183</TD>
+						<TD>201</TD>
+						<TD>913</TD>
+						<TD>933</TD>
+						<TD>1328</TD>
+						<TD>-6.016562692821026e-03</TD>
+						<TD>1.275522541254759e-02</TD>
+						<TD>1.532631861995055e+03</TD>
+						<TD>7.880475191789603e-01</TD>
+						<TD>0</TD>
+						<TD>2.799334991049464e-03</TD>
+						<TD>1.734822351044036e+05</TD>
+						<TD>9.635188381284890e+04</TD>
+						<TD>1.411500559093812e+05</TD>
+						<TD>8.123088355063681e+00</TD>
+						<TD>4.487549429518831e+00</TD>
+						<TD>-2.129560202099066e+01</TD>
+						<TD>6.178310361902519e+00</TD>
+						<TD>4.510936863323048e+00</TD>
+						<TD>-1.088540561332157e+01</TD>
+						<TD>-1.000000000000000e+00</TD>
+						<TD>4.029995528807473e-01</TD>
+						<TD>6.088028785977406e-01</TD>
+						<TD>5.701895105519956e-01</TD>
+						<TD>3.559838025365344e+02</TD>
+						<TD>4.305341566313995e+00</TD>
+						<TD>6.812625179954841e+00</TD>
+						<TD>3.132975258691228e+02</TD>
+						<TD>-5.656496392315163e+01</TD>
+						<TD>1.347132173193290e+09</TD>
+						<TD>696</TD>
+						<TD>188</TD>
+						<TD>920</TD>
+						<TD>3.133045391553983e+02</TD>
+						<TD>-5.656838790550489e+01</TD>
+						<TD>1.347111111111059e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J204453.10-545722.5</TD>
+						<TD>7</TD>
+						<TD>1.417971179984100e+03</TD>
+						<TD>1.141025673453926e+03</TD>
+						<TD>8.907959208012511e+02</TD>
+						<TD>1412</TD>
+						<TD>1426</TD>
+						<TD>1134</TD>
+						<TD>1150</TD>
+						<TD>868</TD>
+						<TD>918</TD>
+						<TD>4832</TD>
+						<TD>-6.277784239500761e-03</TD>
+						<TD>7.884680293500423e-03</TD>
+						<TD>2.643668788743749e+03</TD>
+						<TD>7.442040270120672e-01</TD>
+						<TD>4</TD>
+						<TD>2.261355562336292e-03</TD>
+						<TD>8.810799852960656e+05</TD>
+						<TD>4.996777263388617e+05</TD>
+						<TD>8.816691680374194e+05</TD>
+						<TD>8.259127203733449e+00</TD>
+						<TD>5.491330096623439e+00</TD>
+						<TD>5.483817312859543e+00</TD>
+						<TD>8.477014813042477e+00</TD>
+						<TD>4.172871774221051e+00</TD>
+						<TD>1.153439916556479e+01</TD>
+						<TD>1.994925364368524e+02</TD>
+						<TD>3.038683921358872e-01</TD>
+						<TD>3.973609826440458e-01</TD>
+						<TD>1.145964293431005e+00</TD>
+						<TD>5.485404316650598e+02</TD>
+						<TD>4.819460218673507e+00</TD>
+						<TD>1.084556464421835e+01</TD>
+						<TD>3.112212463919424e+02</TD>
+						<TD>-5.495624582465388e+01</TD>
+						<TD>1.346570294829602e+09</TD>
+						<TD>1417</TD>
+						<TD>1139</TD>
+						<TD>885</TD>
+						<TD>3.112238627330712e+02</TD>
+						<TD>-5.495967533738133e+01</TD>
+						<TD>1.346462962962912e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J205522.24-544900.3</TD>
+						<TD>8</TD>
+						<TD>5.148200080972352e+02</TD>
+						<TD>1.238685071674053e+03</TD>
+						<TD>7.328926907156398e+02</TD>
+						<TD>509</TD>
+						<TD>523</TD>
+						<TD>1233</TD>
+						<TD>1245</TD>
+						<TD>719</TD>
+						<TD>747</TD>
+						<TD>2103</TD>
+						<TD>-8.051507174968719e-03</TD>
+						<TD>9.956198744475842e-03</TD>
+						<TD>1.358345931335369e+03</TD>
+						<TD>8.743985666840186e-01</TD>
+						<TD>4</TD>
+						<TD>2.212886959154474e-03</TD>
+						<TD>3.464178571826204e+05</TD>
+						<TD>7.505949596372276e+04</TD>
+						<TD>3.625667640368981e+05</TD>
+						<TD>6.932555745241763e+00</TD>
+						<TD>4.879259679098116e+00</TD>
+						<TD>-5.488948715071983e+01</TD>
+						<TD>8.897457491207124e+00</TD>
+						<TD>3.016729405431493e+00</TD>
+						<TD>-5.782241894932051e+01</TD>
+						<TD>1.210468803917064e+02</TD>
+						<TD>4.191167307598745e-01</TD>
+						<TD>3.806373800890646e-01</TD>
+						<TD>8.984516359169678e-01</TD>
+						<TD>3.541238631297693e+02</TD>
+						<TD>3.835793271117683e+00</TD>
+						<TD>7.801324399770338e+00</TD>
+						<TD>3.138426663150941e+02</TD>
+						<TD>-5.481673983176522e+01</TD>
+						<TD>1.343646160939130e+09</TD>
+						<TD>512</TD>
+						<TD>1237</TD>
+						<TD>733</TD>
+						<TD>3.138508389879926e+02</TD>
+						<TD>-5.481953374014504e+01</TD>
+						<TD>1.343648148148100e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J205542.54-554557.0</TD>
+						<TD>9</TD>
+						<TD>4.880502767290093e+02</TD>
+						<TD>6.692552538325002e+02</TD>
+						<TD>5.807453360445717e+02</TD>
+						<TD>483</TD>
+						<TD>493</TD>
+						<TD>663</TD>
+						<TD>677</TD>
+						<TD>564</TD>
+						<TD>600</TD>
+						<TD>2000</TD>
+						<TD>-6.127895321696997e-03</TD>
+						<TD>6.417884957045317e-03</TD>
+						<TD>1.330449128764071e+03</TD>
+						<TD>9.226959711226289e-01</TD>
+						<TD>0</TD>
+						<TD>2.331872820368358e-03</TD>
+						<TD>4.884284411320575e+05</TD>
+						<TD>3.320547550702957e+05</TD>
+						<TD>4.874275668105029e+05</TD>
+						<TD>5.116712799403040e+00</TD>
+						<TD>3.795073906138897e+00</TD>
+						<TD>-2.942473009176295e+01</TD>
+						<TD>2.997874824552499e+00</TD>
+						<TD>2.185081689893627e+00</TD>
+						<TD>-7.184332092992030e+01</TD>
+						<TD>-1.000000000000000e+00</TD>
+						<TD>3.447705132224038e-01</TD>
+						<TD>4.327659113945602e-01</TD>
+						<TD>1.034860594367106e+00</TD>
+						<TD>3.639118400297003e+02</TD>
+						<TD>3.655965490585543e+00</TD>
+						<TD>7.313930626097428e+00</TD>
+						<TD>3.139272376716675e+02</TD>
+						<TD>-5.576582292617211e+01</TD>
+						<TD>1.340828617334113e+09</TD>
+						<TD>489</TD>
+						<TD>670</TD>
+						<TD>587</TD>
+						<TD>3.139244145434831e+02</TD>
+						<TD>-5.576458792555830e+01</TD>
+						<TD>1.340944444444399e+09</TD>
+					</TR>
+					<TR>
+						<TD>SoFiA J205935.85-550418.3</TD>
+						<TD>10</TD>
+						<TD>1.523219350994138e+02</TD>
+						<TD>1.081859637194944e+03</TD>
+						<TD>8.730677450992066e+01</TD>
+						<TD>147</TD>
+						<TD>157</TD>
+						<TD>1076</TD>
+						<TD>1088</TD>
+						<TD>60</TD>
+						<TD>114</TD>
+						<TD>2723</TD>
+						<TD>-5.681226961314678e-03</TD>
+						<TD>1.053157541900873e-02</TD>
+						<TD>2.326099511673308e+03</TD>
+						<TD>9.695927980340490e-01</TD>
+						<TD>0</TD>
+						<TD>2.297087842355666e-03</TD>
+						<TD>8.816181737483207e+05</TD>
+						<TD>6.261212661142724e+05</TD>
+						<TD>8.859343168903301e+05</TD>
+						<TD>4.971450759361895e+00</TD>
+						<TD>3.998704316720085e+00</TD>
+						<TD>-2.310191346483809e+01</TD>
+						<TD>4.779445757377299e+00</TD>
+						<TD>3.432493020536029e+00</TD>
+						<TD>-3.566720868023528e+01</TD>
+						<TD>3.662571177055992e+01</TD>
+						<TD>2.513055063881915e-01</TD>
+						<TD>2.973994686897674e-01</TD>
+						<TD>1.334359992295397e+00</TD>
+						<TD>4.182902594139030e+02</TD>
+						<TD>5.560969827345669e+00</TD>
+						<TD>9.763395398896428e+00</TD>
+						<TD>3.148993697809782e+02</TD>
+						<TD>-5.507176024472403e+01</TD>
+						<TD>1.331690866194592e+09</TD>
+						<TD>152</TD>
+						<TD>1080</TD>
+						<TD>95</TD>
+						<TD>3.149004056368128e+02</TD>
+						<TD>-5.507484986943045e+01</TD>
+						<TD>1.331833333333297e+09</TD>
+					</TR>
+				</TABLEDATA>
+			</DATA>
+		</TABLE>
+	</RESOURCE>
+</VOTABLE>

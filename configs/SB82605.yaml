@@ -1,0 +1,32 @@
+# Example field/SB config, matching the real example data in data/run_sofia/ and
+# data/continuum_image/. Paths are relative to this file's directory unless absolute.
+#
+# Used for the Phase 6 full end-to-end validation run against all 45 SoFiA sub-runs.
+
+field_name: SB82605
+
+paths:
+  raw_sofia_dir: ../data/run_sofia
+  work_dir: ../data/work/SB82605
+  continuum_local_dir: ../data/continuum_image
+  # No GAMA catalogue shipped with this example dataset -- leave unset (null) rather
+  # than pointing at a path that doesn't exist; cross-matching is skipped when unset.
+  gama_catalogue: null
+
+dedup:
+  sep_arcsec: 30.0
+  vel_tol_base_km_s: 30.0
+  vel_tol_wm50_factor: 0.6
+
+cosmology:
+  h0: 70.0
+  om0: 0.3
+  tcmb0: 2.725
+
+cutouts:
+  optical_priority: [skyview, legacy_survey]
+  continuum_priority: [local, racs_casda]
+  cutout_size_pix: 256
+  cache_dir: ../data/cutout_cache
+  casda_username_env: CASDA_USERNAME
+  casda_password_env: CASDA_PASSWORD

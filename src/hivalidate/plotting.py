@@ -317,14 +317,31 @@ def build_validation_figure(
 
     # --- panel 6: PV diagram ---
     ax_pv = fig.add_subplot(236, projection=cubelets.pv_wcs)
-    freq_c = row["freq"]
-    line_pixel = cubelets.pv_wcs.wcs_world2pix(0, freq_c * 1e-6, 0)
-    aspect = cubelets.pv_data.shape[1] / cubelets.pv_data.shape[0]
-    ax_pv.imshow(
-        cubelets.pv_data, origin="lower", interpolation="nearest", cmap="viridis", aspect=aspect
-    )
-    ax_pv.axhline(y=line_pixel[1], color="red", linestyle="--")
-    ax_pv.coords.grid(color="k", alpha=0.5, linestyle="dashed")
+    if np.isfinite(cubelets.pv_data).any():
+        freq_c = row["freq"]
+        line_pixel = cubelets.pv_wcs.wcs_world2pix(0, freq_c * 1e-6, 0)
+        aspect = cubelets.pv_data.shape[1] / cubelets.pv_data.shape[0]
+        ax_pv.imshow(
+            cubelets.pv_data, origin="lower", interpolation="nearest", cmap="viridis", aspect=aspect
+        )
+        ax_pv.axhline(y=line_pixel[1], color="red", linestyle="--")
+        ax_pv.coords.grid(color="k", alpha=0.5, linestyle="dashed")
+    else:
+        # Found live 2026-07-30: SoFiA itself occasionally writes an all-NaN PV
+        # cubelet for a source (rare -- 1/448 in the first full run_sofia batch)
+        # even though that same source's mom0/mom1 have real data. Not a bug in
+        # this pipeline -- but an unlabelled blank panel is indistinguishable from
+        # one, so say so explicitly rather than silently rendering nothing.
+        ax_pv.text(
+            0.5, 0.5, "No PV data available\n(SoFiA produced an empty PV cubelet)",
+            ha="center", va="center", transform=ax_pv.transAxes, fontsize=11,
+        )
+        # Nothing was imshow()'n for WCSAxes to auto-scale from, which otherwise
+        # leaves an arbitrary, tiny, visually cluttered default range -- pin it to
+        # the cubelet's own nominal pixel shape instead, matching what a real image
+        # would have set.
+        ax_pv.set_xlim(0, cubelets.pv_data.shape[1])
+        ax_pv.set_ylim(0, cubelets.pv_data.shape[0])
     ax_pv.coords[0].set_axislabel("Angular Offset (arcsec)", fontsize=14)
     ax_pv.coords[0].set_format_unit(u.arcsec)
     ax_pv.coords[0].set_major_formatter("x")

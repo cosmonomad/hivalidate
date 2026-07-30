@@ -7,6 +7,7 @@ practical for a unit test. A real end-to-end visual check (actual dry-run output
 inspected by eye) is documented in the Phase 3 commit message instead.
 """
 
+import dataclasses
 from pathlib import Path
 
 import numpy as np
@@ -108,6 +109,39 @@ class TestBuildValidationFigure:
         cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
         fig = build_validation_figure(row, cubelets, optical=None, continuum=None)
         assert isinstance(fig, Figure)
+
+    def test_all_nan_pv_data_shows_a_clear_placeholder_not_a_blank_panel(self):
+        # Regression test: found live 2026-07-30 that SoFiA occasionally writes an
+        # all-NaN PV cubelet for a real source (confirmed against the actual data --
+        # 1/448 sources in the first full run_sofia batch; that source's own FITS
+        # header even has PVD_PA = -NAN, SoFiA's own record that it couldn't
+        # determine a kinematic position angle). Not a bug in this pipeline, but an
+        # unlabelled blank panel looks exactly like one -- must say so explicitly.
+        row = _real_row()
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        nan_pv_cubelets = dataclasses.replace(
+            cubelets, pv_data=np.full_like(cubelets.pv_data, np.nan)
+        )
+        fig = build_validation_figure(
+            row, nan_pv_cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        ax_pv = fig.axes[-1]
+        texts = [t.get_text() for t in ax_pv.texts]
+        assert any("No PV data available" in t for t in texts)
+        # No image should have been drawn either.
+        assert len(ax_pv.images) == 0
+
+    def test_normal_pv_data_is_unaffected_by_the_nan_check(self):
+        row = _real_row()
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        assert np.isfinite(cubelets.pv_data).any(), "fixture assumption changed"
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        ax_pv = fig.axes[-1]
+        assert len(ax_pv.images) == 1
+        texts = [t.get_text() for t in ax_pv.texts]
+        assert not any("No PV data available" in t for t in texts)
 
     def test_never_calls_plt_show_or_touches_pyplot_state(self, monkeypatch):
         # This is the whole point of Figure-based construction (PLAN.md issue #3) --

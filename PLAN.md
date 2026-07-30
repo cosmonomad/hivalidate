@@ -336,7 +336,7 @@ Package name: `hivalidate` (confirmed).
   the three tiny detections land at their real, distinct sky positions within the
   full field.
 
-### Phase 6 — End-to-end validation [in progress]
+### Phase 6 — End-to-end validation [DONE 2026-07-30]
 - [x] Fresh full-scale combine → dedup → rename over all 45 runs, from scratch --
       reproduced Phase 1's numbers exactly (670 → 448 sources, 5824 files),
       confirming determinism across every later-phase code change.
@@ -405,13 +405,40 @@ Package name: `hivalidate` (confirmed).
     fallback chain, so there's no single "whichever backend responded" to chase).
     Re-verified visually: 192 arcsec FOV (vs the first fix's 960), contour
     detail clearly visible, all four panels still matching.
-- [ ] Full-scale dry-run re-run with all fixes (in progress -- two prior full
-      batch runs were discarded since they'd have needed regenerating
-      anyway; a fresh 448-source run is what's currently executing)
-- [ ] QA + post-process at a representative scale (not fabricating full QA
-      judgments for all 448 sources -- that's inherently a human task; already
-      proven correct at real scale in Phases 4/5, revisit here only if the larger
-      dry-run batch surfaces something the smaller real tests didn't)
+- [x] **Full-scale dry-run completed: 448/448 sources OK, 0 failures**, all fixes
+  above included. Two prior full batch runs were discarded mid-flight as bugs were
+  found and fixed rather than let them finish and regenerate anyway.
+- **A third real bug found by inspecting this full-scale output**: one source
+  (`SoFiA_J203449.97-531430.0`) had a completely blank PV panel. Investigated the
+  actual FITS data, not just the code: that source's `*_pv.fits` cubelet is
+  entirely NaN (2583/2583 pixels) -- confirmed genuinely SoFiA's own output (its
+  header's `PVD_PA` is literally `-NAN`, SoFiA's own record that it couldn't
+  determine a kinematic position angle), not a pipeline bug. Scanned all 448 real
+  cubelets: 1/448 (0.2%) have this characteristic. `build_validation_figure` now
+  shows "No PV data available (SoFiA produced an empty PV cubelet)" instead of a
+  silent blank panel indistinguishable from a rendering failure. 2 regression
+  tests added.
+- **Reproducibility-metadata bug found while patching the above**: the fix for
+  the PV bug was committed *while the 448-source batch was still running* (the
+  process had the older code already loaded in memory). `hivalidate-dry-run`'s
+  manifest computed its recorded git commit hash *after* the batch loop finished,
+  so a fresh `git rev-parse HEAD` at that point picked up the newer commit from
+  disk -- misattributing nearly the whole batch's actual output to a commit that,
+  in truth, only affected the one source manually re-rendered afterward. Fixed by
+  capturing the hash once before the batch loop starts instead of after.
+- [x] QA + post-process re-run against the real, full-scale (448-source) manifest:
+  scripted a 10-source review (not fabricating judgments for all 448 -- that's
+  inherently a human task, already proven correct at real scale in Phases 4/5),
+  then ran `hivalidate-postprocess` for real against the full 448-source deduped
+  catalogue and the real full-field mosaic: correctly filtered to the 5
+  true-flagged sources, copied their 65 cubelet files, and built a mosaic FITS
+  matching the field's real (3585, 3552) shape via `reproject_and_coadd`.
+- **Summary**: four real bugs found and fixed in this phase, none of them caught
+  by unit tests written against the same wrong assumptions as the code -- every
+  one required generating and actually looking at real output (visually or by
+  inspecting the underlying FITS data) to catch. This is the concrete case for
+  why PLAN.md's "verified live" pattern was worth the time it cost throughout
+  every earlier phase, not just this one.
 
 ### Phase 7 — Polish
 - [ ] Fill in `docs/pipeline_overview.md`

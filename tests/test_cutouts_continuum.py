@@ -39,13 +39,18 @@ PIXSCALE_DEG = 0.0005555537726647
 
 @pytest.fixture
 def local_continuum_dir(tmp_path):
-    wcs = WCS(naxis=2)
-    wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
-    wcs.wcs.crval = [FIELD_CENTRE.ra.deg, FIELD_CENTRE.dec.deg]
-    wcs.wcs.crpix = [200, 200]
-    wcs.wcs.cdelt = [-PIXSCALE_DEG, PIXSCALE_DEG]
+    # 4 axes (RA, Dec, Stokes, Freq), matching the real continuum mosaic's structure
+    # -- this is what exposed a real bug live 2026-07-30: fetch() was returning the
+    # raw 4D WCS instead of WCS(header).celestial, which crashed WCSAxes plotting
+    # ("WCS has more than 2 pixel dimensions") even though the data array itself was
+    # already 2D. A naxis=2-only fixture wouldn't reproduce this.
+    wcs = WCS(naxis=4)
+    wcs.wcs.ctype = ["RA---SIN", "DEC--SIN", "STOKES", "FREQ"]
+    wcs.wcs.crval = [FIELD_CENTRE.ra.deg, FIELD_CENTRE.dec.deg, 1, 1.4e9]
+    wcs.wcs.crpix = [200, 200, 1, 1]
+    wcs.wcs.cdelt = [-PIXSCALE_DEG, PIXSCALE_DEG, 1, 1e6]
 
-    data = np.random.default_rng(0).normal(0, 1e-4, size=(400, 400)).astype(np.float32)
+    data = np.random.default_rng(0).normal(0, 1e-4, size=(1, 1, 400, 400)).astype(np.float32)
     header = wcs.to_header()
     fits.writeto(tmp_path / "mini_continuum.fits", data, header, overwrite=True)
     return tmp_path
@@ -80,6 +85,9 @@ class TestLocalContinuumBackend:
         assert result.data.ndim == 2
         assert 15 <= result.data.shape[0] <= 25  # mSubimage's own rounding, not exact
         assert result.provenance == "local:mini_continuum.fits"
+        # Regression check: the WCS must be 2D too (matching the data), not the raw
+        # 4D WCS from the input mosaic -- this is what broke WCSAxes plotting live.
+        assert result.wcs.pixel_n_dim == 2
         # WCS round-trips a real sky position back near the field centre.
         ra, dec = result.wcs.celestial.wcs_pix2world(
             [[result.data.shape[1] / 2, result.data.shape[0] / 2]], 0

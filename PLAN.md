@@ -258,14 +258,33 @@ Package name: `hivalidate` (confirmed).
       exact, not a heuristic.
 - [x] Provenance recording — every `CutoutResult` carries which backend supplied it.
 
-### Phase 3 — Plotting (dry-run, the HPC-safe stage)
-- [ ] `plotting.py`: extract the six-panel figure builder from `validate_detections.py`
-      into a pure function taking cutouts/catalogue row → figure, always rendered on
-      `Agg` and saved to disk — no `plt.show()`, no prompts, safe inside an HPC batch job
-- [ ] Dry-run CLI: runs the preflight connectivity check first, then batch-generates
-      PNGs for all sources plus a manifest (per-source paths, provenance, catalogue
-      row) that phase 4 consumes
-- [ ] Fault isolation per source (issue #8): one failed cutout/plot logs and continues
+### Phase 3 — Plotting (dry-run, the HPC-safe stage) [DONE 2026-07-30]
+- [x] `plotting.py`: six-panel figure builder (`build_validation_figure`) extracted
+      as a pure function (`Figure` in, data out -- no file I/O, no `plt.show()`).
+      Verified live by rendering real sources to PNG and inspecting them, not just
+      unit tests -- caught two real bugs the unit tests (built from the same wrong
+      assumptions as the code) couldn't have: (1) `LocalContinuumBackend` was
+      returning the raw 4D WCS instead of `.celestial`, which crashed WCSAxes
+      plotting entirely; (2) the PV panel's FITS header needs its frequency axis
+      rescaled Hz->MHz before building its WCS (a step in the legacy script's
+      `get_pv_data` that got missed when porting) -- without it the panel rendered
+      blank with a nonsensical multi-GHz axis instead of failing loudly. Both fixed,
+      both covered by regression tests using the real bug conditions, not the
+      original (wrong) assumptions. Two deliberate improvements over the legacy
+      script: continuum display range from robust cutout statistics instead of a
+      hardcoded vmin/vmax that only suited one field, and provenance annotated on
+      the figure itself.
+- [x] Dry-run CLI (`hivalidate-dry-run`): preflight check first (warns if some
+      backends in a chain are down but others still work, aborts only if an entire
+      chain is unusable), then batch-generates PNGs + `manifest.json` (per-source
+      status/provenance/error, plus run-level git commit hash + version + config
+      name for reproducibility).
+- [x] Fault isolation per source (issue #8): one source's cutout/plot failure is
+      logged and the batch continues -- verified with a real sabotaged cubelet file.
+- **Ran for real** against 5 real sources from the full 448-source deduped catalogue
+  (`data/work/SB82605/`), with real SkyView + real local continuum cutouts (Legacy
+  Survey was still down from Phase 2's outage; the preflight correctly warned and
+  the batch proceeded on SkyView alone). All 5 produced correct six-panel PNGs.
 
 ### Phase 4 — Interactive QA (runs locally, not on HPC)
 - [ ] `qa.py`: review loop over the dry-run manifest/PNGs only — never regenerates

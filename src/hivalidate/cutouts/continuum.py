@@ -109,7 +109,14 @@ class LocalContinuumBackend(CutoutBackend):
                 data = hdul[0].data.copy()
                 header = hdul[0].header.copy()
 
-        return CutoutResult(data=data, wcs=WCS(header), provenance=f"local:{infile.name}")
+        # mSubimage can leave stale NAXIS3/4 (Stokes/frequency) keywords in the
+        # output header even though the data array it writes is already 2D --
+        # .celestial strips those so the WCS matches the data's actual dimensionality
+        # (found live 2026-07-30: plotting a local continuum cutout with the raw,
+        # non-celestial WCS raised "WCS has more than 2 pixel dimensions").
+        return CutoutResult(
+            data=data, wcs=WCS(header).celestial, provenance=f"local:{infile.name}"
+        )
 
     def is_available(self) -> tuple[bool, str]:
         try:

@@ -15,6 +15,7 @@ import io
 import numpy as np
 import pytest
 import requests
+from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 
@@ -39,25 +40,32 @@ def _fake_skyview_header():
             "CRVAL2": -55.8032,
             "CRPIX1": 5,
             "CRPIX2": 5,
-            "CDELT1": -1.7 / 3600,
-            "CDELT2": 1.7 / 3600,
+            "CDELT1": -1.0 / 3600,
+            "CDELT2": 1.0 / 3600,
         }
     )
 
 
 class TestSkyViewBackendMocked:
-    def test_converts_size_arcsec_to_pixels_using_dss2_platescale(self, monkeypatch):
+    def test_requests_field_of_view_as_an_angular_quantity_not_a_pixel_count(self, monkeypatch):
+        # Regression test for the real bug found by inspecting dry-run output: a
+        # hardcoded (and wrong) assumed plate scale used to convert size_arcsec into
+        # a pixel count, silently returning too small a field of view. Requesting
+        # width/height directly (in real angular units) removes the assumption
+        # entirely rather than requiring a corrected constant.
         captured = {}
 
-        def fake_get_images(*, position, survey, projection, pixels):
-            captured["pixels"] = pixels
-            hdu = FakeHDU(np.ones((pixels, pixels)), _fake_skyview_header())
+        def fake_get_images(*, position, survey, projection, width, height):
+            captured["width"] = width
+            captured["height"] = height
+            hdu = FakeHDU(np.ones((10, 10)), _fake_skyview_header())
             return [[hdu]]
 
         monkeypatch.setattr("hivalidate.cutouts.optical.SkyView.get_images", fake_get_images)
         backend = SkyViewBackend()
         backend.fetch(POSITION, size_arcsec=170.0)
-        assert captured["pixels"] == 100  # 170 / 1.7
+        assert captured["width"] == 170.0 * u.arcsec
+        assert captured["height"] == 170.0 * u.arcsec
 
     def test_provenance_includes_survey_name(self, monkeypatch):
         def fake_get_images(**kwargs):

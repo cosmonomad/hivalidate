@@ -12,6 +12,7 @@ from __future__ import annotations
 import io
 
 import requests
+from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -34,29 +35,38 @@ class _NonRetryableStatus(Exception):
 
 
 class SkyViewBackend(CutoutBackend):
-    """DSS2 Red (or any other SkyView survey) via `astroquery.skyview`. SkyView's
-    `get_images` takes a pixel count, not an angular size directly, so this backend
-    assumes a fixed arcsec/pixel scale to convert -- 1.7 arcsec/pixel is DSS2's native
-    plate scale (the value the legacy script implicitly relied on by only ever
-    passing a pixel count), not independently verified against SkyView's documentation
-    for every survey it can serve. If you use `survey=` other than a DSS2 variant,
-    double-check this assumption still gives a sensible field of view.
+    """DSS2 Red (or any other SkyView survey) via `astroquery.skyview`.
+
+    Requests the field of view via `get_images`'s `width`/`height` (angular
+    `Quantity`) parameters, not a pixel count converted through an assumed plate
+    scale -- SkyView handles that conversion itself, correctly, for whichever survey
+    is selected. An earlier version of this backend assumed a fixed 1.7 arcsec/pixel
+    DSS2 plate scale to convert `size_arcsec` into a pixel count; the real plate
+    scale is 1.0 arcsec/pixel (confirmed live 2026-07-30 against a real SkyView
+    response's CDELT), so every optical cutout had an actual field of view ~59% of
+    what was requested -- smaller than the same-source continuum cutout, which
+    always used real degrees via MontagePy and was correct. This is what caused the
+    HI detection contour (drawn from the same real-size moment-0 data in both
+    panels) to visibly appear larger on the optical panel than the continuum panel
+    in `plotting.build_validation_figure`'s output -- found by inspecting real
+    dry-run plots, not caught by any test, since the bug was a wrong physical
+    constant, not a code path that could crash or an assertion that could fail.
     """
 
     name = "skyview"
-
-    DSS2_ARCSEC_PER_PIX = 1.7
 
     def __init__(self, survey: str = "DSS2 Red", max_retries: int = 5):
         self.survey = survey
         self.max_retries = max_retries
 
     def fetch(self, position: SkyCoord, size_arcsec: float) -> CutoutResult:
-        n_pix = max(int(round(size_arcsec / self.DSS2_ARCSEC_PER_PIX)), 1)
-
         def _query():
             images = SkyView.get_images(
-                position=position, survey=self.survey, projection="Sin", pixels=n_pix
+                position=position,
+                survey=self.survey,
+                projection="Sin",
+                width=size_arcsec * u.arcsec,
+                height=size_arcsec * u.arcsec,
             )
             if not images:
                 raise CutoutUnavailable(f"SkyView returned no images for survey {self.survey!r}")

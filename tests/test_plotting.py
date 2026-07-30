@@ -157,7 +157,7 @@ class TestAllSkyPanelsShareTheSameFieldOfView:
         fig = build_validation_figure(row, cubelets, optical=optical, continuum=continuum)
         return fig, cubelets
 
-    def test_reference_fov_is_five_times_mom0s_own_footprint(self):
+    def test_reference_fov_is_display_fov_factor_times_mom0s_own_footprint(self):
         cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
         fov = reference_field_of_view_arcsec(cubelets)
 

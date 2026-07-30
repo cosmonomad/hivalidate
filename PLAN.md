@@ -385,8 +385,28 @@ Package name: `hivalidate` (confirmed).
   plus 4 new regression tests in `test_plotting.py` that deliberately give optical
   and continuum different native pixel scales (the real-world condition that
   exposed bug 3) and assert their displayed field of view matches within 5%.
-- [ ] Full-scale dry-run re-run with all three fixes (in progress -- the batch run
-      before these fixes was discarded since it would have needed regenerating
+  - **Follow-up correction, same day**: the fix above initially used
+    `DISPLAY_FOV_FACTOR = 5` (all panels 5x wider than mom0's own footprint) --
+    direct feedback was that this made contour detail hard to see, and a
+    request to check how the legacy script actually handled it. Re-read
+    `legacy/validate_detections.py`'s exact panel projections/limits: it
+    achieves cross-panel consistency by borrowing pixel limits (mom0/mom1 from
+    optical) and, for continuum, by reading back the optical cutout's *actual*
+    returned real size and requesting that same size for continuum (a
+    fetch-time "chase" mechanism, not a display-time one) -- but the reference
+    size it all traces back to, `npix = max(mom0_shape) * 5`, is a pixel count
+    taken at the *optical survey's own resolution* (~1.0"/pix for DSS2), not
+    mom0's (6.0"/pix here), so legacy's actual displayed FOV worked out to
+    ≈0.83x mom0's real footprint -- an artifact of mixing pixel counts across
+    two different resolution grids, not a deliberate ratio. Changed
+    `DISPLAY_FOV_FACTOR` to `1.0` (exactly mom0's own footprint) per the direct
+    instruction, keeping `_set_fov`'s display-time-pinning mechanism (more
+    robust than fetch-time chasing now that continuum has a multi-backend
+    fallback chain, so there's no single "whichever backend responded" to chase).
+    Re-verified visually: 192 arcsec FOV (vs the first fix's 960), contour
+    detail clearly visible, all four panels still matching.
+- [ ] Full-scale dry-run re-run with all fixes (in progress -- two prior full
+      batch runs were discarded since they'd have needed regenerating
       anyway; a fresh 448-source run is what's currently executing)
 - [ ] QA + post-process at a representative scale (not fabricating full QA
       judgments for all 448 sources -- that's inherently a human task; already

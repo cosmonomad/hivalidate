@@ -22,12 +22,19 @@ values that only happened to suit one specific field/SB:
   per panel (PLAN.md section 5, "Provenance").
 
 Every sky panel (optical, continuum, mom0, mom1) is pinned to the same real
-angular field of view, computed from the mom0 image's own WCS (`reference_field_of_
-view_arcsec`) -- not each panel's own auto-scaled image extent. Found live
-2026-07-30: the continuum panel's displayed field of view was visibly wider than
-the others because nothing constrained it to match; only mom0/mom1 borrowed the
-optical panel's pixel limits (which happens to work only because they share its
-exact WCS), and the optical panel itself was never anchored to anything.
+angular field of view, computed from the mom0 image's own WCS
+(`reference_field_of_view_arcsec`) -- not each panel's own auto-scaled image extent.
+Found live 2026-07-30: the continuum panel's displayed field of view was visibly
+wider than the others because nothing constrained it to match; only mom0/mom1
+borrowed the optical panel's pixel limits (which happens to work only because they
+share its exact WCS), and the optical panel itself was never anchored to anything.
+The reference field of view is exactly mom0's own real footprint (`DISPLAY_FOV_
+FACTOR = 1`) -- an initial fix used a 5x-wider context view, but that made contour
+detail hard to see, per direct feedback, and doesn't actually correspond to the
+legacy script's own `npix = max(mom0_shape) * 5`: that multiplied mom0's *pixel
+count* by 5 and used the result as a pixel count for the optical cutout request, at
+whatever the optical survey's own (different, generally finer) pixel scale happens
+to be -- not 5x mom0's real angular size in any survey-independent sense.
 """
 
 from __future__ import annotations
@@ -49,10 +56,10 @@ from matplotlib.ticker import FormatStrFormatter
 from hivalidate import conversions
 from hivalidate.cutouts.base import CutoutResult
 
-#: How much wider than the mom0 detection's own footprint to fetch/display cutouts,
-#: matching the legacy script's `npix = max(mom0_shape) * 5` convention -- enough
-#: surrounding sky for context, not just the detection mask itself.
-DISPLAY_FOV_FACTOR = 5
+#: How much wider than the mom0 detection's own footprint to fetch/display cutouts.
+#: 1.0 (exactly mom0's own footprint) per direct feedback 2026-07-30: an earlier 5x
+#: value made the wider context visible but the contour detail itself hard to see.
+DISPLAY_FOV_FACTOR = 1.0
 
 
 @dataclass

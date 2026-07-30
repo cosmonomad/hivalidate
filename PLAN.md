@@ -286,13 +286,31 @@ Package name: `hivalidate` (confirmed).
   Survey was still down from Phase 2's outage; the preflight correctly warned and
   the batch proceeded on SkyView alone). All 5 produced correct six-panel PNGs.
 
-### Phase 4 — Interactive QA (runs locally, not on HPC)
-- [ ] `qa.py`: review loop over the dry-run manifest/PNGs only — never regenerates
-      cutouts or figures, so it has no `Agg`/HPC constraint and can use a normal
-      interactive matplotlib backend or a simple image viewer
-- [ ] Resumable, incremental per-source save (fixes issue #7), optional comment field,
-      back option
-- [ ] Output catalogue gets qa flag + provenance + comment + reproducibility metadata
+### Phase 4 — Interactive QA (runs locally, not on HPC) [DONE 2026-07-30, one part user-only-verifiable]
+- [x] `qa.py`: review loop (`run_qa_session`) over the dry-run manifest/PNGs only --
+      never regenerates cutouts or figures. `display_fn`/`prompt_fn`/`close_fn` are
+      injected, so the state machine, incremental persistence, and catalogue merge
+      are all fully unit-tested without a real display or keyboard; `default_display`
+      deliberately does not call `matplotlib.use(...)` (unlike dry-run's forced
+      `Agg`), since this is meant to run somewhere with an actual screen.
+- [x] Resumable, incremental per-source save (fixes issue #7): every review is
+      written to `qa_results.json` immediately, and a second session skips anything
+      already in it without re-displaying. `b` (back) removes and re-presents the
+      previous source; `q` saves and stops early. All three verified against real
+      manifest/PNG data (not just the fixture), including a real back-correction.
+- [x] Output catalogue (`validated_cat.xml`): numeric `qa` flag (legacy convention:
+      0/1/2/3 = false/true/uncertain/duplicate), free-text `qa_comment`, optical/
+      continuum provenance and dry-run status pulled from the manifest, `NaN`/empty
+      for anything not yet reviewed (safe to inspect after a partial session).
+      `run_info.json` alongside it carries the same reproducibility metadata as the
+      dry-run manifest (git commit, version, config name, review counts).
+- **What's verified vs. not**: the review *logic* (state machine, persistence,
+  catalogue merge, `default_display`/`default_close` not crashing on a real PNG) was
+  run for real against a real 5-source manifest from Phase 3 -- git commit hash,
+  provenance, and all four flags round-tripped correctly into `validated_cat.xml`.
+  The actual interactive experience (a real matplotlib window plus blocking
+  terminal `input()`) can't be exercised by an automated tool the way SkyView or
+  CASDA calls could -- that part needs a human running `hivalidate-qa` themselves.
 
 ### Phase 5 — Post-processing
 - [ ] `postprocess.py`: migrate `create_validation_csv.py`, `extract_true_cubelets.py`,

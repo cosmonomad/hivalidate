@@ -14,10 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 import sys
-from datetime import datetime, timezone
-from pathlib import Path
 
 import matplotlib
 
@@ -35,24 +32,9 @@ from hivalidate.cutouts.base import (  # noqa: E402
     fetch_with_fallback,
 )
 from hivalidate.cutouts.registry import build_continuum_chain, build_optical_chain  # noqa: E402
+from hivalidate.provenance import git_commit_hash, now_iso  # noqa: E402
 
 logger = logging.getLogger(__name__)
-
-
-def _git_commit_hash() -> str:
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=Path(__file__).parent,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        pass
-    return "unknown"
 
 
 def _preflight_or_abort(config: Config) -> None:
@@ -120,9 +102,9 @@ def run(config: Config) -> dict:
     manifest = {
         "run_info": {
             "hivalidate_version": __version__,
-            "hivalidate_git_commit": _git_commit_hash(),
+            "hivalidate_git_commit": git_commit_hash(),
             "config_field_name": config.field_name,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": now_iso(),
         },
         "sources": sources,
     }

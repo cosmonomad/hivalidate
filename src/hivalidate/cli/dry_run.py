@@ -121,10 +121,11 @@ def run(config: Config) -> dict:
 
 def _process_one_source(row, source_name, config, optical_chain, continuum_chain, cache) -> dict:
     position = SkyCoord(ra=row["ra"], dec=row["dec"], unit="deg")
-    # Matches the legacy script's convention: field of view scales with the source's
-    # own moment-0 footprint, not a fixed angular size for every source.
     cubelets = plotting.load_source_cubelets(config.paths.renamed_cubelets_dir, source_name)
-    size_arcsec = max(cubelets.mom0.shape) * 5 * 1.7
+    # The same reference field of view build_validation_figure pins every sky panel
+    # to -- computed from mom0's own real WCS pixel scale, not an assumed constant
+    # (see plotting.reference_field_of_view_arcsec's docstring for why that matters).
+    size_arcsec = plotting.reference_field_of_view_arcsec(cubelets)
 
     optical = _fetch_or_none(position, size_arcsec, source_name, optical_chain, cache)
     continuum = _fetch_or_none(position, size_arcsec, source_name, continuum_chain, cache)

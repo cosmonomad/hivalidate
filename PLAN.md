@@ -336,12 +336,62 @@ Package name: `hivalidate` (confirmed).
   the three tiny detections land at their real, distinct sky positions within the
   full field.
 
-### Phase 6 — End-to-end validation
-- [ ] Run the full pipeline over all 45 `run_sofia/` runs: combine → dedup → rename →
-      dry-run → QA → post-process
-- [ ] Cross-check output against the 159 known examples in `data/output_validation_true/`
-      as a regression check
-- [ ] Fix whatever breaks at real scale that the fixture didn't catch
+### Phase 6 — End-to-end validation [in progress]
+- [x] Fresh full-scale combine → dedup → rename over all 45 runs, from scratch --
+      reproduced Phase 1's numbers exactly (670 → 448 sources, 5824 files),
+      confirming determinism across every later-phase code change.
+- [x] Cross-checked the 448-source deduped catalogue against the 159 legacy "true"
+      examples in `data/output_validation_true/` by positional match (exact-name
+      matching found zero overlap -- expected, given how centroid-sensitive SoFiA's
+      name strings are; parsed RA/Dec directly from the legacy filenames' embedded
+      J-coordinates instead): **144/159 (90.5%) matched within 30″**, median
+      separation 2.0″. The 15 non-matches were checked against the *pre-dedup*
+      combined catalogue too (not just deduped) -- separations were essentially
+      identical before and after dedup, ruling out dedup as the cause; most are
+      hundreds of arcsec to ~20 arcmin away, meaning they're simply outside the sky
+      area these 45 runs cover (a different pointing in the legacy dataset), not a
+      pipeline defect.
+- **Two real bugs found and fixed by inspecting actual full-scale dry-run output**
+  (not caught by any test, since both were wrong physical constants producing
+  plausible-looking but incorrect images, not code paths that could crash):
+  1. `SkyViewBackend` assumed a hardcoded 1.7 arcsec/pixel DSS2 plate scale to
+     convert requested field-of-view into a pixel count. The real plate scale is
+     1.0 arcsec/pixel (confirmed live against a real SkyView response's CDELT), so
+     every optical cutout had an actual field of view ~59% of what was requested.
+     Fixed by requesting `width`/`height` as angular `Quantity` params directly
+     (verified live that `astroquery.skyview.SkyView.get_images` supports this) --
+     removes the plate-scale assumption entirely rather than just correcting the
+     constant, so it stays correct for any survey, not only DSS2.
+  2. `hivalidate.cli.dry_run`'s cutout-sizing calculation used the *same* wrong 1.7
+     arcsec/pixel constant a second time, to convert mom0's pixel shape into a
+     requested angular size. The real mom0 pixel scale for this dataset is 6.0
+     arcsec/pixel (confirmed live against a real cubelet header) -- off by 3.5x, a
+     different wrong number than bug 1's but the identical root cause (an assumed
+     constant standing in for something computable from the actual WCS). Fixed by
+     computing the field of view from mom0's own real WCS pixel scale
+     (`plotting.reference_field_of_view_arcsec`) instead of assuming.
+  3. Even with the cutout *request* sizes now correct, the continuum panel's
+     *displayed* field of view still didn't match the other three sky panels --
+     only mom0/mom1 explicitly borrowed the optical panel's pixel limits (which
+     only worked because they share its exact WCS by construction); the optical
+     panel itself was never anchored to anything, and the continuum panel was never
+     constrained at all, just auto-scaled to its own cutout's native extent. Fixed
+     with `plotting._set_fov`, which pins every sky panel's xlim/ylim to the same
+     real sky box (computed from mom0, per the explicit design ask: "HI moment 0
+     should be reference") regardless of each panel's own native pixel scale or a
+     backend's rounding of the requested size.
+  All three fixed together and verified by re-rendering the same real source and
+  visually confirming all four sky panels now show identical RA/Dec tick ranges,
+  plus 4 new regression tests in `test_plotting.py` that deliberately give optical
+  and continuum different native pixel scales (the real-world condition that
+  exposed bug 3) and assert their displayed field of view matches within 5%.
+- [ ] Full-scale dry-run re-run with all three fixes (in progress -- the batch run
+      before these fixes was discarded since it would have needed regenerating
+      anyway; a fresh 448-source run is what's currently executing)
+- [ ] QA + post-process at a representative scale (not fabricating full QA
+      judgments for all 448 sources -- that's inherently a human task; already
+      proven correct at real scale in Phases 4/5, revisit here only if the larger
+      dry-run batch surfaces something the smaller real tests didn't)
 
 ### Phase 7 — Polish
 - [ ] Fill in `docs/pipeline_overview.md`

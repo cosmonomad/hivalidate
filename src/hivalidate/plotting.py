@@ -20,6 +20,14 @@ values that only happened to suit one specific field/SB:
 - Provenance (which optical/continuum backend actually supplied each cutout) is
   annotated directly on the figure, since there are now multiple possible sources
   per panel (PLAN.md section 5, "Provenance").
+
+Every sky panel (optical, continuum, mom0, mom1) is pinned to the same real
+angular field of view, computed from the mom0 image's own WCS (`reference_field_of_
+view_arcsec`) -- not each panel's own auto-scaled image extent. Found live
+2026-07-30: the continuum panel's displayed field of view was visibly wider than
+the others because nothing constrained it to match; only mom0/mom1 borrowed the
+optical panel's pixel limits (which happens to work only because they share its
+exact WCS), and the optical panel itself was never anchored to anything.
 """
 
 from __future__ import annotations
@@ -29,6 +37,7 @@ from pathlib import Path
 
 import numpy as np
 from astropy import units as u
+from astropy.coordinates import SkyCoord
 from astropy.cosmology import Cosmology
 from astropy.io import fits
 from astropy.table import Row, Table
@@ -39,6 +48,11 @@ from matplotlib.ticker import FormatStrFormatter
 
 from hivalidate import conversions
 from hivalidate.cutouts.base import CutoutResult
+
+#: How much wider than the mom0 detection's own footprint to fetch/display cutouts,
+#: matching the legacy script's `npix = max(mom0_shape) * 5` convention -- enough
+#: surrounding sky for context, not just the detection mask itself.
+DISPLAY_FOV_FACTOR = 5
 
 
 @dataclass
@@ -97,6 +111,41 @@ def load_source_cubelets(cubelets_dir: str | Path, source_name: str) -> SourceCu
     )
 
 
+def reference_field_of_view_arcsec(cubelets: SourceCubelets) -> float:
+    """The real angular field of view every sky panel in `build_validation_figure` is
+    pinned to, and what `hivalidate.cli.dry_run` sizes its cutout requests from:
+    `DISPLAY_FOV_FACTOR` times the mom0 image's own real footprint (the larger of its
+    two axes), computed from its actual WCS pixel scale.
+
+    Deliberately not a hardcoded arcsec/pixel constant -- an earlier version of both
+    this and the SkyView backend assumed 1.7 arcsec/pixel (copied from the same wrong
+    assumption in two unrelated places); the real mom0 pixel scale for this dataset
+    is 6.0 arcsec/pixel, confirmed live 2026-07-30 against a real cubelet header.
+    Using the WCS directly removes the assumption for any dataset's actual pixel
+    scale, not just this one.
+    """
+    ny, nx = cubelets.mom0.shape
+    scales = cubelets.mom0_wcs.celestial.proj_plane_pixel_scales()
+    width_arcsec = (nx * scales[0]).to(u.arcsec).value
+    height_arcsec = (ny * scales[1]).to(u.arcsec).value
+    return max(width_arcsec, height_arcsec) * DISPLAY_FOV_FACTOR
+
+
+def _set_fov(ax, wcs: WCS, center: SkyCoord, size_arcsec: float) -> None:
+    """Pins `ax`'s displayed field of view to a `size_arcsec` box centered on
+    `center`, in `wcs`'s own pixel frame. Called with the same `center`/`size_arcsec`
+    for every sky panel so they all show the same patch of sky regardless of each
+    cutout's own native pixel scale or a backend's rounding of the requested size.
+    """
+    celestial_wcs = wcs.celestial
+    scales = celestial_wcs.proj_plane_pixel_scales()
+    half_width_pix = (size_arcsec / 2 * u.arcsec) / scales[0].to(u.arcsec)
+    half_height_pix = (size_arcsec / 2 * u.arcsec) / scales[1].to(u.arcsec)
+    x0, y0 = celestial_wcs.world_to_pixel(center)
+    ax.set_xlim(float(x0 - half_width_pix.value), float(x0 + half_width_pix.value))
+    ax.set_ylim(float(y0 - half_height_pix.value), float(y0 + half_height_pix.value))
+
+
 def _robust_vlim(data: np.ndarray, n_sigma: float = 3.0) -> tuple[float, float]:
     """mean +/- n_sigma*std, falling back to (0, 1) for degenerate (all-equal or
     all-NaN) data -- avoids a matplotlib warning/blank image on a placeholder cutout.
@@ -141,6 +190,8 @@ def build_validation_figure(
 
     mom0_wcs = cubelets.mom0_wcs
     display_wcs = optical.wcs if optical is not None else mom0_wcs
+    center = SkyCoord(ra=row["ra"], dec=row["dec"], unit="deg")
+    fov_arcsec = reference_field_of_view_arcsec(cubelets)
 
     fig = Figure(figsize=(18, 11))
     fig.subplots_adjust(left=0.05, right=0.98, wspace=0.1)
@@ -176,6 +227,7 @@ def build_validation_figure(
         ax_opt.set_title("Optical (no cutout available)", size=12)
     _format_sky_axes(ax_opt, ylabel=True)
     _annotate_moment0(ax_opt)
+    _set_fov(ax_opt, display_wcs, center, fov_arcsec)
 
     # --- panel 2: continuum + mom0 contours ---
     cont_wcs = continuum.wcs if continuum is not None else mom0_wcs
@@ -198,6 +250,7 @@ def build_validation_figure(
         ax_cont.set_title("Continuum (no cutout available)", size=12)
     _format_sky_axes(ax_cont, ylabel=False)
     _annotate_moment0(ax_cont)
+    _set_fov(ax_cont, cont_wcs, center, fov_arcsec)
 
     # --- panel 3: HI spectrum ---
     ax_spec = fig.add_subplot(233)
@@ -234,10 +287,9 @@ def build_validation_figure(
     ax_mom0.contour(
         col_density_map, levels=contour_levels_scaled, transform=ax_mom0.get_transform(mom0_wcs)
     )
-    ax_mom0.set_xlim(ax_opt.get_xlim())
-    ax_mom0.set_ylim(ax_opt.get_ylim())
     _format_sky_axes(ax_mom0, ylabel=True)
     _annotate_moment0(ax_mom0)
+    _set_fov(ax_mom0, display_wcs, center, fov_arcsec)
 
     # --- panel 5: mom1 (velocity) ---
     ax_mom1 = fig.add_subplot(235, projection=display_wcs)
@@ -248,14 +300,13 @@ def build_validation_figure(
         cmap="jet",
         transform=ax_mom1.get_transform(mom0_wcs),
     )
-    ax_mom1.set_xlim(ax_opt.get_xlim())
-    ax_mom1.set_ylim(ax_opt.get_ylim())
     _format_sky_axes(ax_mom1, ylabel=False)
     ax_mom1.annotate(
         "Moment 1", (0.75, 0.93), size=12, xycoords="axes fraction", bbox=_label_bbox()
     )
     colorbar = fig.colorbar(mom1_image, ax=ax_mom1, orientation="vertical", pad=0.01, aspect=30)
     colorbar.ax.set_ylabel(r"Velocity (km s$^{-1}$)")
+    _set_fov(ax_mom1, display_wcs, center, fov_arcsec)
 
     # --- panel 6: PV diagram ---
     ax_pv = fig.add_subplot(236, projection=cubelets.pv_wcs)

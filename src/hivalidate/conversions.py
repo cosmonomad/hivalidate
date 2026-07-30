@@ -32,6 +32,10 @@ def freq_to_redshift(freq_hz: np.ndarray | float) -> np.ndarray | float:
     """Convert observed frequency to redshift for the HI 21cm line.
 
     z = f_HI / f_obs - 1
+
+    The definitional relation between redshift and rest/observed frequency -- not
+    survey- or paper-specific, so not separately cited in REFERENCES.md beyond the
+    HI_REST_FREQ_HZ value itself (a standard physical constant).
     """
     return HI_REST_FREQ_HZ / freq_hz - 1.0
 
@@ -58,8 +62,10 @@ def freq_to_velocity(freq_hz: np.ndarray | float, v_frame: str = "optical") -> n
 
 def velocity_to_freq(vel_m_s: np.ndarray | float, v_frame: str = "optical") -> np.ndarray | float:
     """Convert line-of-sight velocity (in m/s) to observed frequency. Inverse of
-    `freq_to_velocity`, but note the input unit is m/s here (matching the legacy
-    script) while `freq_to_velocity` returns km/s -- callers must convert explicitly.
+    `freq_to_velocity` (see REFERENCES.md, radio/optical velocity convention entry,
+    for the underlying relation), but note the input unit is m/s here (matching the
+    legacy script) while `freq_to_velocity` returns km/s -- callers must convert
+    explicitly.
     """
     c_m_s = SPEED_OF_LIGHT_KM_S * 1000.0
     if v_frame == "optical":
@@ -73,9 +79,11 @@ def freq_width_to_velocity_dispersion(
     freq_width_hz: np.ndarray | float, freq_centre_hz: np.ndarray | float
 ) -> np.ndarray | float:
     """Convert a frequency width (e.g. SoFiA's w20/w50/wm50 linewidths) to a velocity
-    width, using the local (non-relativistic) approximation dv = c * df / f0.
-    Adequate at DINGO/WALLABY-pilot redshifts (z << 1); would need a relativistic
-    treatment to be accurate at cosmological distances.
+    width, using the local (non-relativistic) approximation dv = c * df / f0 -- the
+    same radio/optical convention as `freq_to_velocity` (REFERENCES.md), applied to a
+    width instead of an absolute frequency. Adequate at DINGO/WALLABY-pilot redshifts
+    (z << 1); would need a relativistic treatment to be accurate at cosmological
+    distances.
     """
     return SPEED_OF_LIGHT_KM_S * freq_width_hz / freq_centre_hz
 
@@ -155,7 +163,9 @@ def column_density_sensitivity(
     n_sigma: float,
 ) -> np.ndarray | float:
     """N-sigma column-density detection limit for a given per-channel RMS noise,
-    by plugging the N-sigma flux limit (rms * channel width * N) into `column_density`.
+    by plugging the N-sigma flux limit (rms * channel width * N) into `column_density`
+    -- see that function's docstring and REFERENCES.md's "Known caveat" entry for the
+    citation and the caveat on the underlying constant.
     """
     s_limit = rms_noise * freq_width_hz * n_sigma
     return column_density(s_limit, z, beam_area_arcsec2)

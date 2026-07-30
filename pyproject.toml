@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hivalidate"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Validation pipeline for SoFiA HI source-finding output (DINGO/WALLABY-style ASKAP surveys)."
 readme = "README.md"
 license = { file = "LICENSE" }

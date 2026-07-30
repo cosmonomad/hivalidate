@@ -18,7 +18,11 @@ scripts being migrated.
 ## Surveys used for cutouts / cross-matching
 
 - **[GAMA]** Driver, S. P., et al. 2011, "Galaxy and Mass Assembly (GAMA): survey
-  diagnostics and core data release", MNRAS, 413, 971.
+  diagnostics and core data release", MNRAS, 413, 971. Not yet used by any code in
+  this repo -- `Config.paths.gama_catalogue` exists in the schema, but the actual
+  cross-match (ported from the legacy script's `search_gama`) is explicitly out of
+  scope for v1 (PLAN.md section 7, "Explicit non-goals"). Kept here so the citation
+  is ready when/if that's built.
 - **[DSS2]** STScI Digitized Sky Survey II, accessed via `astroquery.skyview`.
 - **[LegacySurvey]** Dey, A., et al. 2019, "Overview of the DESI Legacy Imaging
   Surveys", AJ, 157, 168. Cutout service: https://www.legacysurvey.org/

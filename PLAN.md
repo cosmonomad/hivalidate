@@ -1,8 +1,10 @@
 # HI Source-Finding Validation Pipeline — Implementation Plan
 
-Status: draft, not yet started. This document captures everything decided in planning
-discussion before writing code. Update it as decisions change — it should stay the
-single source of truth for scope and sequencing.
+Status: **v0.1 complete (2026-07-30)** — all seven phases below done, definition of
+done (section 9) fully satisfied. This document captures everything decided during
+planning and every bug found/fixed during implementation; it remains the source of
+truth for design rationale even though active build-out is finished. Update it if
+that changes (new phases, a v0.2 scope, etc.).
 
 ## 1. Goal
 
@@ -440,26 +442,55 @@ Package name: `hivalidate` (confirmed).
   why PLAN.md's "verified live" pattern was worth the time it cost throughout
   every earlier phase, not just this one.
 
-### Phase 7 — Polish
-- [ ] Fill in `docs/pipeline_overview.md`
-- [ ] Finish `README.md`, confirm `REFERENCES.md` covers all cited science
-- [ ] Confirm CI green, tag `v0.1`
+### Phase 7 — Polish [DONE 2026-07-30]
+- [x] Filled in `docs/pipeline_overview.md`: data-flow diagram (Mermaid) plus a
+      stage-by-stage walkthrough grounded in the real Phase 6 numbers (670 -> 448
+      sources, 33% dedup rate, 5824 cubelet files, 448/448 dry-run success), not
+      illustrative placeholders.
+- [x] `README.md`: Status section updated to reflect all seven phases complete (and
+      the one known unresolved item -- `column_density`'s unverified constant --
+      surfaced there, not buried); added a Quick Start with the full real command
+      sequence; added `hivalidate-check-connectivity` to the stages table (it existed
+      since Phase 2 but was missing from this table).
+- [x] `REFERENCES.md` cross-checked against actual code citations (`grep` for every
+      bracketed key across `src/`): every citation used in code has a matching entry,
+      and every physics function in `conversions.py` now has a docstring pointing at
+      one, including the small helpers (`freq_to_redshift`, `velocity_to_freq`,
+      `freq_width_to_velocity_dispersion`, `column_density_sensitivity`) that just
+      derive from an already-cited relation rather than needing a separate source.
+      Added a note to the `[GAMA]` entry clarifying it's not used by any code yet
+      (the cross-match itself is an explicit non-goal, section 7) so its presence in
+      the bibliography doesn't look like an oversight.
+- [x] CI verified green by actually running its exact steps locally, not just
+      reading the workflow file: `pip install -e ".[dev]"`, `ruff check src tests`,
+      `pytest -v` -- 134 passed, lint clean. Confirmed the workflow's YAML parses
+      and its `branches: [main]` trigger matches the repo's actual current branch.
+- [x] Version bumped `0.1.0.dev0` -> `0.1.0` in `pyproject.toml` and
+      `hivalidate.__version__`; tagged `v0.1` (local tag only -- this repository has
+      no configured remote to push it to).
 
 ## 9. Definition of done for v1
 
-- Pipeline runs end-to-end on `run_sofia/` via CLI, driven entirely by a config file
-  (no hardcoded per-field constants left in source).
-- Optical cutouts fall back SkyView → Legacy Survey; continuum falls back local file →
-  RACS/CASDA (non-interactive login); both cached and provenance-tracked.
-- Dry-run runs unattended on an HPC compute node (`Agg` only, no display, no
+- [x] Pipeline runs end-to-end on `run_sofia/` via CLI, driven entirely by a config
+  file (no hardcoded per-field constants left in source).
+- [x] Optical cutouts fall back SkyView → Legacy Survey; continuum falls back local
+  file → RACS/CASDA (non-interactive login); both cached and provenance-tracked.
+- [x] Dry-run runs unattended on an HPC compute node (`Agg` only, no display, no
   interactive prompts) and produces plots + manifest for the whole sample before any
   QA happens.
-- QA runs as a fully separate stage against the dry-run output (no live cutout/figure
-  regeneration), is resumable, and never loses progress on interruption.
-- A preflight connectivity/auth check (CASDA login + trivial query, image-survey
+- [x] QA runs as a fully separate stage against the dry-run output (no live
+  cutout/figure regeneration), is resumable, and never loses progress on
+  interruption.
+- [x] A preflight connectivity/auth check (CASDA login + trivial query, image-survey
   reachability) runs automatically before dry-run starts processing sources, and
   fails fast with a clear error if something's misconfigured.
-- `tests/` pass in CI against the fixture; a full run against `run_sofia/` has been
-  done at least once and checked against `data/output_validation_true/`.
-- Every function touching HI physics has a docstring citing `REFERENCES.md`.
-- Git history exists from phase 0 onward; no large data files committed.
+- [x] `tests/` pass in CI against the fixture (134 passed, verified locally against
+  the exact CI steps); a full run against `run_sofia/` has been done (448/448 OK)
+  and checked against `data/output_validation_true/` (144/159, 90.5%, matched
+  positionally within 30").
+- [x] Every function touching HI physics has a docstring citing `REFERENCES.md`.
+- [x] Git history exists from phase 0 onward (16 commits); no large data files
+  committed (`.git` is 16 MB; largest tracked file is a 484 KB fixture FITS file,
+  committed deliberately for tests).
+
+All definition-of-done items satisfied. v0.1 tagged.

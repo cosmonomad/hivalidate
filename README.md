@@ -6,13 +6,18 @@ Takes raw per-run SoFiA catalogues and cubelets through combination, deduplicati
 renaming, dry-run plot generation, interactive quality assessment, and post-processing
 into a validated source catalogue.
 
-See [`PLAN.md`](PLAN.md) for the full design rationale and build sequence, and
-[`docs/pipeline_overview.md`](docs/pipeline_overview.md) for a stage-by-stage
-walkthrough once it's filled in (Phase 7).
+See [`PLAN.md`](PLAN.md) for the full design rationale, build sequence, and every bug
+found/fixed along the way, and [`docs/pipeline_overview.md`](docs/pipeline_overview.md)
+for a stage-by-stage walkthrough of how it works now.
 
 ## Status
 
-Under active development -- see `PLAN.md` for phase-by-phase progress.
+v0.1: all seven build phases in `PLAN.md` complete. Verified end-to-end against the
+real 45-run `data/run_sofia/` example dataset (670 raw detections -> 448 unique
+sources -> 448/448 dry-run PNGs generated -> QA and post-process re-verified against
+that full-scale output). One thing not independently re-derived: the exact numeric
+constant in `conversions.column_density()` -- see `REFERENCES.md`'s "Known caveat"
+before treating a reported column density as science-final.
 
 ## Installation
 
@@ -24,6 +29,26 @@ conda activate hivalidate
 MontagePy ships prebuilt wheels on PyPI, but availability varies by platform/Python
 version. If `pip install MontagePy` fails, check that a wheel exists for your
 Python/OS combination before assuming something else is broken.
+
+## Quick start
+
+Against the example data in `data/run_sofia/` (see `configs/SB82605.yaml`):
+
+```bash
+hivalidate-check-connectivity --config configs/SB82605.yaml   # verify backends first
+hivalidate-combine   --config configs/SB82605.yaml
+hivalidate-dedup     --config configs/SB82605.yaml
+hivalidate-rename    --config configs/SB82605.yaml
+hivalidate-dry-run   --config configs/SB82605.yaml            # HPC-safe -- run this on the cluster
+hivalidate-qa        --config configs/SB82605.yaml            # run this locally, not on HPC
+hivalidate-postprocess --config configs/SB82605.yaml
+```
+
+Each stage reads its input from disk and checks it exists, so they don't need to run
+back-to-back in one session -- dry-run in particular is meant to run unattended on an
+HPC compute node, with QA picking up its output later on a machine with a display.
+See [`docs/pipeline_overview.md`](docs/pipeline_overview.md) for what each stage
+reads/writes and why.
 
 ## Configuration
 
@@ -131,6 +156,7 @@ Never put credentials in a config file that gets committed to git.
 
 | Stage | Command | Notes |
 |---|---|---|
+| Connectivity check | `hivalidate-check-connectivity` | Verify every configured cutout backend before a big batch run |
 | Combine | `hivalidate-combine` | Merge per-run SoFiA catalogues into one |
 | Dedup | `hivalidate-dedup` | Positional/velocity cross-match dedup, not string match |
 | Rename | `hivalidate-rename` | Map per-run numeric IDs to source names, copy cubelets |

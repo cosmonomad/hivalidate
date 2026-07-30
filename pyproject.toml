@@ -10,7 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 authors = [
-    { name = "<COPYRIGHT HOLDER>" },
+    { name = "Jonghwan Rhee", email = "jonghwan.rhee@uwa.edu.au" },
 ]
 
 # Kept in sync with environment.yml. MontagePy ships prebuilt wheels but wheel

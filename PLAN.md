@@ -186,26 +186,38 @@ Package name: `hivalidate` (confirmed).
 
 ## 8. Build sequence
 
-### Phase 0 — Repo scaffolding
-- [ ] `git init`, `.gitignore` (incl. any local CASDA credentials file), `LICENSE`
+### Phase 0 — Repo scaffolding [DONE 2026-07-30]
+- [x] `git init`, `.gitignore` (incl. any local CASDA credentials file), `LICENSE`
       (BSD-3-Clause)
-- [ ] Directory structure as in §4, with `run_sofia/` moved to `data/run_sofia/`
-- [ ] `pyproject.toml` + `environment.yml` (pin dependencies incl. `MontagePy`,
-      `astropy`, `astroquery`, `reproject`, `matplotlib`, `numpy`, `requests`)
-- [ ] `.pre-commit-config.yaml` (ruff/black), `.github/workflows/ci.yml`
-- [ ] `README.md` skeleton (incl. OPAL/CASDA account setup instructions),
+- [x] Directory structure as in §4, with `run_sofia/` moved to `data/run_sofia/`
+- [x] `pyproject.toml` + `environment.yml` (pin dependencies incl. `MontagePy`,
+      `astropy`, `astroquery`, `reproject`, `matplotlib`, `numpy`, `requests`) --
+      MontagePy pinned to >=2.3 (the real PyPI version; the plan's placeholder >=6.0
+      was wrong, caught when `pip install -e .` actually failed)
+- [x] `.pre-commit-config.yaml` (ruff/black), `.github/workflows/ci.yml`
+- [x] `README.md` skeleton (incl. OPAL/CASDA account setup instructions),
       `REFERENCES.md` skeleton
-- [ ] Extract the small `run_sofia_mini` fixture (2-3 runs) into `tests/fixtures/`
+- [x] Extract a `run_sofia_mini` fixture into `tests/fixtures/` -- ended up as 5 real
+      runs (001, 002, 003, 011, 012), not 2-3, specifically to include a known
+      cross-run duplicate pair (011/012) for a true-positive dedup test
+- Legacy scripts moved to `legacy/` (not deleted) for reference during migration.
 
-### Phase 1 — Core science + catalogue layer
-- [ ] `config.py`: load/validate per-field YAML config
-- [ ] `conversions.py`: migrate freq/z/vel/mass/column-density functions from
+### Phase 1 — Core science + catalogue layer [DONE 2026-07-30]
+- [x] `config.py`: load/validate per-field YAML config
+- [x] `conversions.py`: migrate freq/z/vel/mass/column-density functions from
       `validate_detections.py`, full docstrings + `REFERENCES.md` citations, unit tests
-- [ ] `catalogue.py`: VOTable read, multi-run combine (replaces `plot_detections.py`'s
+      -- **found and fixed a real bug**: the legacy frequency-rest-frame HI mass formula
+      was missing [Meyer2017]'s `1/(1+z)` term (~1-10% effect at these redshifts)
+- [x] `catalogue.py`: VOTable read, multi-run combine (replaces `plot_detections.py`'s
       combine step), positional dedup (replaces `remove_duplicate.py`), id→name mapping
       per run (replaces `rename_cubelets.py` logic) — fixes issues #1, #5, #6, #9
-- [ ] CLI: `combine`, `dedup`, `rename` stages runnable against `run_sofia/`
-- [ ] Tests against `run_sofia_mini` fixture
+- [x] CLI: `combine`, `dedup`, `rename` stages runnable against `run_sofia/`
+- [x] Tests against `run_sofia_mini` fixture (41 tests, all passing)
+- **Ran for real against the full 45-run `data/run_sofia/`**: 670 raw detections ->
+  222 removed as duplicates (33%) -> 448 unique sources, 5824 renamed cubelet files.
+  Far more duplication than the legacy script's 14 exact-string matches -- verified
+  this is real, not over-merging (accepted pairs: median 0.33″/0.4 km/s separation;
+  correctly-rejected sky-close pairs: thousands of km/s apart in velocity).
 
 ### Phase 2 — Cutout layer
 - [ ] `cutouts/base.py`: fallback-chain abstraction, on-disk cache, retry/backoff

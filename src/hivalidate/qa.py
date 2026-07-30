@@ -105,12 +105,14 @@ def run_qa_session(config: Config, prompt_fn, display_fn, close_fn) -> dict:
 
 
 def merge_qa_into_catalogue(config: Config, manifest: dict, results: dict):
-    """Writes `validated_cat.xml`: the deduped catalogue plus `qa`/`qa_comment`
-    (NaN/empty for anything not yet reviewed -- safe to run after a partial session)
-    and the optical/continuum provenance and dry-run status from the manifest, so
-    the final catalogue records not just the verdict but what was actually looked at
-    to reach it. Also writes `run_info.json` alongside it (PLAN.md section 5,
-    "Reproducibility metadata").
+    """Writes `validated_cat.xml` and `validated_cat.csv` (identical content, VOTable
+    and plain CSV -- the CSV is for anyone/anything downstream that would rather not
+    deal with VOTable XML): the deduped catalogue plus `qa`/`qa_comment` (NaN/empty
+    for anything not yet reviewed -- safe to run after a partial session) and the
+    optical/continuum provenance and dry-run status from the manifest, so the final
+    catalogue records not just the verdict but what was actually looked at to reach
+    it. Also writes `run_info.json` alongside it (PLAN.md section 5, "Reproducibility
+    metadata").
     """
     deduped = catalogue.read_votable(config.paths.deduped_catalogue)
     manifest_by_name = {s["name"]: s for s in manifest["sources"]}
@@ -134,6 +136,7 @@ def merge_qa_into_catalogue(config: Config, manifest: dict, results: dict):
 
     config.paths.qa_dir.mkdir(parents=True, exist_ok=True)
     catalogue.write_votable(deduped, config.paths.qa_dir / "validated_cat.xml")
+    catalogue.write_csv(deduped, config.paths.qa_dir / "validated_cat.csv")
 
     run_info = {
         "hivalidate_version": __version__,
@@ -147,7 +150,7 @@ def merge_qa_into_catalogue(config: Config, manifest: dict, results: dict):
         json.dump(run_info, fh, indent=2)
 
     logger.info(
-        "Wrote %s (%d/%d reviewed)",
+        "Wrote %s and .csv (%d/%d reviewed)",
         config.paths.qa_dir / "validated_cat.xml",
         len(results),
         len(deduped),

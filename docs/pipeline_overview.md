@@ -14,7 +14,7 @@ flowchart TD
     B -->|hivalidate-dedup| C["deduped_cat.xml<br/>(448 unique sources)"]
     C -->|hivalidate-rename| D["cubelets/<br/>5824 renamed files"]
     D -->|hivalidate-dry-run| E["dry_run/<br/>448 PNGs + manifest.json"]
-    E -->|hivalidate-qa| F["qa/<br/>validated_cat.xml"]
+    E -->|hivalidate-qa| F["qa/<br/>validated_cat.xml + .csv"]
     F -->|hivalidate-postprocess| G["postprocess/<br/>CSV + true cubelets + mosaic"]
 
     H[SkyView / Legacy Survey] -.optical cutout.-> E
@@ -108,9 +108,10 @@ the legacy script's numeric convention for continuity) and an optional comment.
   to the end. Re-running the command skips anything already reviewed.
 - **`b` (back)**: re-opens the previous source, discarding its saved flag, so a
   mis-keyed answer doesn't require restarting the session.
-- Writes `validated_cat.xml` (the deduped catalogue plus `qa`, `qa_comment`, and the
-  optical/continuum provenance pulled from the manifest) after every session, even a
-  partial one -- unreviewed sources get `NaN`/empty rather than blocking the file
+- Writes `validated_cat.xml` and `validated_cat.csv` (identical content, VOTable and
+  plain CSV) -- the deduped catalogue plus `qa`, `qa_comment`, and the
+  optical/continuum provenance pulled from the manifest -- after every session, even
+  a partial one -- unreviewed sources get `NaN`/empty rather than blocking the file
   from being written at all.
 
 ## Stage 6: Post-process (`hivalidate-postprocess`)

@@ -111,6 +111,7 @@ class TestRunQaSessionHappyPath:
         qa.run_qa_session(prepared_config, _scripted(responses), display_fn, _noop_close)
 
         assert (prepared_config.paths.qa_dir / "validated_cat.xml").exists()
+        assert (prepared_config.paths.qa_dir / "validated_cat.csv").exists()
         run_info_path = prepared_config.paths.qa_dir / "run_info.json"
         assert run_info_path.exists()
         import json
@@ -119,6 +120,21 @@ class TestRunQaSessionHappyPath:
         assert run_info["n_reviewed"] == 4
         assert run_info["n_total"] == 4
         assert run_info["config_field_name"] == prepared_config.field_name
+
+    def test_csv_content_matches_the_xml(self, prepared_config):
+        _, display_fn = _recording_display()
+        responses = [("t", "csv check"), ("f", ""), ("u", ""), ("d", "")]
+        qa.run_qa_session(prepared_config, _scripted(responses), display_fn, _noop_close)
+
+        xml_table = catalogue.read_votable(prepared_config.paths.qa_dir / "validated_cat.xml")
+        import csv as csv_module
+
+        with open(prepared_config.paths.qa_dir / "validated_cat.csv") as fh:
+            csv_rows = list(csv_module.DictReader(fh))
+
+        assert len(csv_rows) == len(xml_table)
+        assert [r["name"] for r in csv_rows] == [str(n) for n in xml_table["name"]]
+        assert [r["qa_comment"] for r in csv_rows] == [str(c) for c in xml_table["qa_comment"]]
 
 
 class TestRunQaSessionQuitAndResume:

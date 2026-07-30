@@ -22,6 +22,8 @@ from astropy.wcs import WCS
 from reproject import reproject_interp
 from reproject.mosaicking import reproject_and_coadd
 
+from hivalidate import catalogue
+
 #: Matches hivalidate.qa.FLAG_TO_NUMERIC's convention.
 QA_TRUE = 1.0
 
@@ -36,9 +38,11 @@ def filter_by_qa(validated_catalogue: Table, qa_values: set[float]) -> Table:
 
 
 def write_validation_csv(table: Table, output_path: str | Path) -> None:
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    table.write(output_path, format="ascii.csv", overwrite=True)
+    """Thin, stage-specific name for `hivalidate.catalogue.write_csv` -- kept as its
+    own function since `hivalidate.cli.postprocess` calling `write_validation_csv`
+    reads more clearly at the call site than the generic `write_csv`.
+    """
+    catalogue.write_csv(table, output_path)
 
 
 def extract_cubelets(cubelets_dir: str | Path, output_dir: str | Path, names: list[str]) -> int:

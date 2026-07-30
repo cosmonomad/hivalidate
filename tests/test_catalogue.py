@@ -13,6 +13,33 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures" / "run_sofia_mini"
 EXPECTED_ROWS_PER_RUN = {"001": 10, "002": 11, "003": 12, "011": 10, "012": 13}
 
 
+class TestWriteCsv:
+    def test_round_trips_row_count_and_names(self, tmp_path):
+        table = catalogue.read_votable(FIXTURE_DIR / "SB82605_Removal_001_cat.xml")
+        out = tmp_path / "out.csv"
+        catalogue.write_csv(table, out)
+
+        import csv
+
+        with open(out) as fh:
+            rows = list(csv.DictReader(fh))
+        assert len(rows) == len(table)
+        assert [r["name"] for r in rows] == [str(n) for n in table["name"]]
+
+    def test_creates_parent_directory_if_missing(self, tmp_path):
+        table = catalogue.read_votable(FIXTURE_DIR / "SB82605_Removal_001_cat.xml")
+        out = tmp_path / "nested" / "dir" / "out.csv"
+        catalogue.write_csv(table, out)
+        assert out.exists()
+
+    def test_overwrites_an_existing_file(self, tmp_path):
+        table = catalogue.read_votable(FIXTURE_DIR / "SB82605_Removal_001_cat.xml")
+        out = tmp_path / "out.csv"
+        catalogue.write_csv(table, out)
+        catalogue.write_csv(table, out)  # must not raise on the second write
+        assert out.exists()
+
+
 def test_find_run_catalogues_finds_all_fixture_runs():
     found = catalogue.find_run_catalogues(FIXTURE_DIR)
     assert [p.name for p in found] == sorted(

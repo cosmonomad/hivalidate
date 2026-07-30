@@ -36,6 +36,17 @@ def write_votable(table: Table, path: str | Path) -> None:
     from_table(table).to_xml(str(path))
 
 
+def write_csv(table: Table, path: str | Path) -> None:
+    """Write an astropy Table out as plain CSV -- for anyone/anything downstream that
+    would rather not deal with VOTable XML. Shared by every stage that writes a
+    catalogue out (`hivalidate.qa`, `hivalidate.postprocess`) so there's one place
+    that knows how, not a copy of `Table.write(..., format="ascii.csv")` in each.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    table.write(path, format="ascii.csv", overwrite=True)
+
+
 def find_run_catalogues(raw_sofia_dir: str | Path, pattern: str = "*_cat.xml") -> list[Path]:
     """Find all per-run SoFiA catalogue files in a directory, sorted for determinism.
 

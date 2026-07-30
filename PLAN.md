@@ -219,19 +219,35 @@ Package name: `hivalidate` (confirmed).
   this is real, not over-merging (accepted pairs: median 0.33″/0.4 km/s separation;
   correctly-rejected sky-close pairs: thousands of km/s apart in velocity).
 
-### Phase 2 — Cutout layer
-- [ ] `cutouts/base.py`: fallback-chain abstraction, on-disk cache, retry/backoff
-      (generalize the existing SkyView retry logic)
-- [ ] `cutouts/optical.py`: SkyView backend (migrate existing), Legacy Survey backend
-      (migrate `download_legacy.py` logic)
-- [ ] `cutouts/continuum.py`: local-file backend (MontagePy `mSubimage`, using
-      `data/continuum_image/`), RACS/CASDA backend (`astroquery.casda`) with
-      non-interactive login from env vars / gitignored credentials file
-- [ ] Preflight check: CASDA login + trivial query, SkyView/Legacy Survey reachability
-      — runs automatically at the start of `dry-run`, also available standalone as
-      `hivalidate check-connectivity`; fails fast with a clear diagnostic
-- [ ] Footprint/coverage pre-checks for both fallback chains
-- [ ] Provenance recording — fixes issue #2, addresses fallback + caching + footprint decisions
+### Phase 2 — Cutout layer [DONE 2026-07-30, one backend unverified]
+- [x] `cutouts/base.py`: fallback-chain abstraction, on-disk cache (FITS, keyed by
+      source/backend/size), retry/backoff (generalized from the SkyView pattern)
+- [x] `cutouts/optical.py`: `SkyViewBackend` (migrated), `LegacySurveyBackend`
+      (migrated from `legacy/download_legacy.py`) — **both verified live**
+      (`pytest -m network tests/test_cutouts_optical.py`). Real finding while doing
+      so: `legacysurvey.org` returned a real 503 during testing (confirmed via
+      `curl`, the whole site was down, not our bug) -- exposed that
+      `LegacySurveyBackend` had no retry/backoff at all, unlike SkyView; added it.
+- [x] `cutouts/continuum.py`: `LocalContinuumBackend` (MontagePy `mSubimage`) --
+      **verified live** against the real `data/continuum_image/*.fits` and real
+      source positions, including the out-of-footprint error path.
+      `RacsCasdaBackend` (`astroquery.casda`) -- implemented against the literal
+      code examples in astroquery's CASDA docs (not memory), with non-interactive
+      login via seeding the OS keyring (astroquery's `login()` has no `password=`
+      parameter -- it only reads from keyring or an interactive prompt; this was
+      confirmed by reading astroquery's source, not assumed). **Not verified live
+      -- no CASDA/OPAL credentials were available in the dev environment.** See
+      README.md "CASDA / RACS access" for exactly how to verify it.
+- [x] Preflight check: `hivalidate-check-connectivity`, run for real against
+      `configs/SB82605.yaml` -- correctly reported SkyView OK, Legacy Survey FAILED
+      (real live outage), local continuum OK, RACS/CASDA FAILED with an actionable
+      "$CASDA_USERNAME is not set" message, and exited 1.
+- [x] Footprint/coverage pre-checks: RACS/CASDA and Legacy Survey use a documented
+      declination-limit heuristic (not a full footprint polygon -- flagged as an
+      approximation in the code, `fetch()` is the real authority); local continuum
+      uses the mosaic's actual WCS footprint (`WCS.footprint_contains`), which is
+      exact, not a heuristic.
+- [x] Provenance recording — every `CutoutResult` carries which backend supplied it.
 
 ### Phase 3 — Plotting (dry-run, the HPC-safe stage)
 - [ ] `plotting.py`: extract the six-panel figure builder from `validate_detections.py`

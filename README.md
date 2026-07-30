@@ -35,19 +35,76 @@ as its `--config` argument -- no per-field values are hardcoded in the package.
 
 The continuum cutout fallback (used when no local continuum mosaic covers a field)
 queries RACS via `astroquery.casda`, which requires an
-[OPAL](https://opal.atnf.csiro.au/) account. Set credentials as environment variables
-before running any stage that needs continuum cutouts:
+[OPAL](https://opal.atnf.csiro.au/) account.
+
+**Important, and not obvious from astroquery's docs:** `Casda.login()` only accepts a
+`username` -- there is no `password=` parameter. The password always comes from your
+OS keyring, or an interactive prompt if it isn't there yet. `hivalidate`'s
+`RacsCasdaBackend` was built around this, and was **not tested against a real CASDA
+account during development** (no credentials were available) -- verify it yourself
+before relying on it for a real batch run:
+
+### Option A: one-time interactive login (simplest, if your keyring works)
+
+On the machine that will actually run `hivalidate-dry-run` (e.g. the HPC login node,
+since your compute nodes have outbound internet but the credential needs to be usable
+from wherever the job runs), run once:
 
 ```bash
 export CASDA_USERNAME=you@example.com
-export CASDA_PASSWORD=...          # never committed; consider a secrets manager
-                                    # or your shell's own credential store instead
-                                    # of a plaintext export in scripts/history
+python3 -c "
+from astroquery.casda import Casda
+casda = Casda()
+ok = casda.login(username='$CASDA_USERNAME', store_password=True)
+print('login OK' if ok else 'login FAILED')
+"
 ```
 
-Never put credentials in a config file that gets committed to git. Run
-`hivalidate-check-connectivity --config configs/<field>.yaml` before a large batch
-job to confirm login and network access work before committing HPC time to it.
+It will prompt for your OPAL password once, then store it in your OS/user keyring.
+Every subsequent non-interactive run (as long as `$CASDA_USERNAME` is set) will read
+the password from the keyring silently -- you do **not** need to set `CASDA_PASSWORD`
+for this option.
+
+If this raises something like `NoKeyringError`, your login node doesn't have a usable
+keyring backend (common on headless Linux systems with no desktop session) -- use
+Option B instead.
+
+### Option B: `CASDA_PASSWORD` env var (works even with no system keyring)
+
+```bash
+export CASDA_USERNAME=you@example.com
+export CASDA_PASSWORD=...          # never committed; treat like any other secret
+```
+
+If `$CASDA_PASSWORD` is set, `RacsCasdaBackend` seeds a keyring entry itself (via the
+plain public `keyring.set_password` API, using the exact service name astroquery's
+own login looks up) immediately before calling `casda.login()`, so it never prompts.
+If your environment has no keyring backend at all, this will fail with a clear error
+telling you to install and configure `keyrings.alt`'s file-based backend --
+hivalidate does not silently reconfigure your keyring backend for you.
+
+### Verifying it yourself
+
+```bash
+hivalidate-check-connectivity --config configs/<field>.yaml
+```
+
+This runs every configured backend's cheap availability check, including a real
+`casda.login()` call (no cutout download) for `racs_casda`. Look for:
+
+```
+[OK] continuum backend 'racs_casda': OK
+```
+
+If it instead prints `[FAILED] ... $CASDA_USERNAME is not set`, `... login failed`, or
+the keyring error above, that tells you which of the two options above to fix. Once
+connectivity passes, the actual cutout logic (RACS filtering, cutout request,
+download) still hasn't been exercised against a real account -- run
+`hivalidate-dry-run` on a small config with a field known to have RACS coverage
+(anything south of Dec +41, per `RacsCasdaBackend.DEC_LIMIT_DEG`) and inspect one of
+the resulting continuum panels before trusting it for a full batch.
+
+Never put credentials in a config file that gets committed to git.
 
 ## Pipeline stages
 

@@ -24,6 +24,7 @@ dependencies = [
     "numpy>=1.26",
     "requests>=2.31",
     "PyYAML>=6.0",
+    "keyring>=24.0",
 ]
 
 [project.optional-dependencies]
@@ -47,6 +48,10 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "network: hits a real external service (SkyView, Legacy Survey, CASDA); excluded by default",
+]
+addopts = "-m 'not network'"
 
 [tool.ruff]
 line-length = 100

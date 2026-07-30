@@ -75,6 +75,14 @@ def run(config: Config) -> dict:
             f"{config.paths.renamed_cubelets_dir} does not exist -- run hivalidate-rename first"
         )
 
+    # Captured now, before the (potentially long-running) batch loop, not after --
+    # otherwise a code change committed while this process is still running would
+    # get attributed to output it didn't actually produce (found live 2026-07-30: a
+    # bug fix was committed mid-batch, and the finished manifest's git commit
+    # initially pointed at that fix even though most of the batch had already
+    # rendered with the previous commit's code, still loaded in this process).
+    git_commit = git_commit_hash()
+
     deduped = catalogue.read_votable(config.paths.deduped_catalogue)
     optical_chain = build_optical_chain(config)
     continuum_chain = build_continuum_chain(config)
@@ -102,7 +110,7 @@ def run(config: Config) -> dict:
     manifest = {
         "run_info": {
             "hivalidate_version": __version__,
-            "hivalidate_git_commit": git_commit_hash(),
+            "hivalidate_git_commit": git_commit,
             "config_field_name": config.field_name,
             "generated_at": now_iso(),
         },

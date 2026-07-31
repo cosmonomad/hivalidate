@@ -90,6 +90,12 @@ Three things make this safe to run unattended on an HPC compute node with no dis
   a chain that's *entirely* unusable aborts immediately, so a broken CASDA login
   doesn't quietly degrade a few hundred sources' continuum panels before anyone
   notices.
+- **Resumable**: `manifest.json` is rewritten after every source, not just once at
+  the end, and a re-run skips any source already recorded as `"ok"` with a PNG still
+  on disk (a `"failed"` one is always retried). An HPC job killed or Ctrl-C'd partway
+  through a batch of hundreds of sources therefore picks back up close to where it
+  left off on the next run, instead of reprocessing -- and, if `cutouts.cache_dir` is
+  configured, re-fetching -- everything from scratch.
 
 All four sky panels (optical, continuum, mom0, mom1) are pinned to the exact same
 real field of view -- computed from the mom0 cubelet's own WCS pixel scale

@@ -7,6 +7,14 @@ one bad cutout/plot doesn't abort a run that might cover hundreds of sources
 consumes -- QA never re-fetches cutouts or regenerates figures, it only ever looks at
 what this command already produced.
 
+Resumable: `manifest.json` is (re)written after every source, not just once at the
+end, and a re-run skips any source already recorded as "ok" with a PNG still on disk
+-- so interrupting a long batch (Ctrl-C, a killed HPC job) and re-running the same
+command picks up roughly where it left off instead of reprocessing (and re-fetching
+cutouts for) everything from scratch. A source previously recorded as "failed" is
+always retried, since whatever caused the failure might not reproduce (e.g. a
+transient network error).
+
 Run `hivalidate-combine`, `hivalidate-dedup`, and `hivalidate-rename` first.
 """
 
@@ -15,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from pathlib import Path
 
 import matplotlib
 
@@ -62,6 +71,63 @@ def _preflight_or_abort(config: Config) -> None:
             )
 
 
+def _load_resumable_sources(manifest_path: Path, config: Config) -> dict[str, dict]:
+    """Returns `{name: entry}` for sources a previous (possibly interrupted) run of
+    this same field already finished -- these are skipped by `run()` rather than
+    reprocessed. Only "ok" entries whose PNG still exists on disk count as done; see
+    this module's docstring for why "failed" entries are excluded (always retried).
+    """
+    if not manifest_path.exists():
+        return {}
+
+    with open(manifest_path) as fh:
+        try:
+            previous = json.load(fh)
+        except json.JSONDecodeError:
+            # A hard kill (not a clean Ctrl-C, which always finishes its own write)
+            # can truncate manifest.json mid-write -- start this batch from scratch
+            # rather than crash on a corrupt resume file.
+            logger.warning(
+                "%s is not valid JSON -- treating this as a fresh batch, not a resume",
+                manifest_path,
+            )
+            return {}
+
+    previous_field = previous.get("run_info", {}).get("config_field_name")
+    if previous_field != config.field_name:
+        logger.warning(
+            "%s belongs to a different field (%r, expected %r) -- treating this as a "
+            "fresh batch, not a resume",
+            manifest_path,
+            previous_field,
+            config.field_name,
+        )
+        return {}
+
+    return {
+        entry["name"]: entry
+        for entry in previous.get("sources", [])
+        if entry.get("status") == "ok" and Path(entry.get("png_path", "")).exists()
+    }
+
+
+def _write_manifest(
+    manifest_path: Path, sources: list[dict], git_commit: str, config: Config
+) -> dict:
+    manifest = {
+        "run_info": {
+            "hivalidate_version": __version__,
+            "hivalidate_git_commit": git_commit,
+            "config_field_name": config.field_name,
+            "generated_at": now_iso(),
+        },
+        "sources": sources,
+    }
+    with open(manifest_path, "w") as fh:
+        json.dump(manifest, fh, indent=2)
+    return manifest
+
+
 def run(config: Config) -> dict:
     """Returns the manifest dict that was also written to disk (useful for tests)."""
     _preflight_or_abort(config)
@@ -89,41 +155,67 @@ def run(config: Config) -> dict:
     cache = CutoutCache(config.cutouts.cache_dir) if config.cutouts.cache_dir else None
 
     config.paths.dry_run_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = config.paths.dry_run_dir / "manifest.json"
+
+    already_done = _load_resumable_sources(manifest_path, config)
+    if already_done:
+        logger.info(
+            "Resuming: %d/%d sources already completed in a previous run of this batch",
+            len(already_done),
+            len(deduped),
+        )
 
     sources: list[dict] = []
-    for row in deduped:
-        source_name = str(row["name"]).replace(" ", "_")
-        entry: dict = {"name": str(row["name"]), "ra": float(row["ra"]), "dec": float(row["dec"])}
-        try:
-            source_result = _process_one_source(
-                row, source_name, config, optical_chain, continuum_chain, cache
-            )
-            entry.update(source_result)
-            entry["status"] = "ok"
-            logger.info("%s: OK", source_name)
-        except Exception as exc:  # noqa: BLE001 -- deliberately broad: one bad source must never abort the batch
-            entry["status"] = "failed"
-            entry["error"] = str(exc)
-            logger.error("%s: FAILED: %s", source_name, exc)
-        sources.append(entry)
+    interrupted = False
+    try:
+        for row in deduped:
+            name = str(row["name"])
+            source_name = name.replace(" ", "_")
 
-    manifest = {
-        "run_info": {
-            "hivalidate_version": __version__,
-            "hivalidate_git_commit": git_commit,
-            "config_field_name": config.field_name,
-            "generated_at": now_iso(),
-        },
-        "sources": sources,
-    }
-    manifest_path = config.paths.dry_run_dir / "manifest.json"
-    with open(manifest_path, "w") as fh:
-        json.dump(manifest, fh, indent=2)
+            existing = already_done.get(name)
+            if existing is not None:
+                sources.append(existing)
+                logger.debug("%s: already done, skipping", source_name)
+                continue
+
+            entry: dict = {"name": name, "ra": float(row["ra"]), "dec": float(row["dec"])}
+            try:
+                source_result = _process_one_source(
+                    row, source_name, config, optical_chain, continuum_chain, cache
+                )
+                entry.update(source_result)
+                entry["status"] = "ok"
+                logger.info("%s: OK", source_name)
+            except Exception as exc:  # noqa: BLE001 -- deliberately broad: one bad source must never abort the batch
+                entry["status"] = "failed"
+                entry["error"] = str(exc)
+                logger.error("%s: FAILED: %s", source_name, exc)
+            sources.append(entry)
+            # Written after every source, not just once at the end -- this is what
+            # makes a re-run after Ctrl-C actually resume instead of starting over
+            # (previously manifest.json was only written once the whole loop had
+            # finished, so an interrupt anywhere in the batch lost all progress made
+            # so far, not just the source that was in flight).
+            _write_manifest(manifest_path, sources, git_commit, config)
+    except KeyboardInterrupt:
+        interrupted = True
+        logger.warning(
+            "Interrupted after %d/%d sources -- progress saved to %s. Re-run the same "
+            "command to continue from here.",
+            len(sources),
+            len(deduped),
+            manifest_path,
+        )
+
+    manifest = _write_manifest(manifest_path, sources, git_commit, config)
 
     n_ok = sum(1 for s in sources if s["status"] == "ok")
-    logger.info(
-        "Dry-run complete: %d/%d sources OK. Manifest: %s", n_ok, len(sources), manifest_path
-    )
+    if interrupted:
+        logger.info("Dry-run interrupted: %d/%d sources completed so far.", n_ok, len(deduped))
+    else:
+        logger.info(
+            "Dry-run complete: %d/%d sources OK. Manifest: %s", n_ok, len(sources), manifest_path
+        )
     return manifest
 
 

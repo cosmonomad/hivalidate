@@ -174,3 +174,127 @@ def test_run_fails_clearly_if_dedup_and_rename_were_not_run(tmp_path, monkeypatc
     _patch_chains(monkeypatch, [], [])
     with pytest.raises(SystemExit, match="hivalidate-dedup"):
         dry_run.run(config)
+
+
+def _counting_wrapper(real, calls, stop_after=None):
+    """Wraps the real `_process_one_source`, recording each source it's called for in
+    `calls` -- lets tests assert exactly which sources got (re)processed. `stop_after`,
+    if given, raises KeyboardInterrupt once `calls` reaches that length, simulating a
+    Ctrl-C partway through the batch. Takes `real` as an argument (rather than reading
+    `dry_run._process_one_source` itself) so a test can build a second wrapper after
+    the first has already been monkeypatched in, without accidentally wrapping the
+    first wrapper instead of the true original.
+    """
+
+    def _wrapped(row, source_name, config, optical_chain, continuum_chain, cache):
+        calls.append(source_name)
+        if stop_after is not None and len(calls) > stop_after:
+            raise KeyboardInterrupt
+        return real(row, source_name, config, optical_chain, continuum_chain, cache)
+
+    return _wrapped
+
+
+class TestDryRunResume:
+    """Regression coverage for a real bug report: Ctrl-C during a long dry-run batch
+    followed by re-running the same command reprocessed every source from scratch
+    instead of picking up where it left off. Fixed by writing manifest.json after
+    every source (not just once at the end) and skipping any source already recorded
+    as "ok" with a PNG still on disk.
+    """
+
+    def test_a_second_run_does_not_reprocess_already_completed_sources(
+        self, monkeypatch, prepared_config
+    ):
+        _patch_chains(monkeypatch, [StubCutoutBackend()], [StubCutoutBackend()])
+        real = dry_run._process_one_source
+        calls: list[str] = []
+        monkeypatch.setattr(dry_run, "_process_one_source", _counting_wrapper(real, calls))
+
+        first = dry_run.run(prepared_config)
+        assert len(calls) == len(first["sources"])  # first run: everything processed
+
+        calls.clear()
+        second = dry_run.run(prepared_config)
+        assert calls == []  # second run: nothing re-processed
+        assert second["sources"] == first["sources"]
+
+    def test_interrupted_batch_saves_partial_progress_and_resumes_on_rerun(
+        self, monkeypatch, prepared_config
+    ):
+        _patch_chains(monkeypatch, [StubCutoutBackend()], [StubCutoutBackend()])
+        deduped = catalogue.read_votable(prepared_config.paths.deduped_catalogue)
+        assert len(deduped) == 3  # sanity check on the fixture slice
+
+        real = dry_run._process_one_source
+        calls: list[str] = []
+        monkeypatch.setattr(
+            dry_run, "_process_one_source", _counting_wrapper(real, calls, stop_after=2)
+        )
+        manifest = dry_run.run(prepared_config)  # must not raise -- KeyboardInterrupt is caught
+        assert len(manifest["sources"]) == 2  # 2 completed before the simulated Ctrl-C
+
+        manifest_on_disk = json.loads(
+            (prepared_config.paths.dry_run_dir / "manifest.json").read_text()
+        )
+        assert manifest_on_disk == manifest  # interrupt handling still wrote to disk
+
+        # Resume: only the 1 remaining source should be processed this time -- wraps
+        # `real` again (the true original), not whatever's currently monkeypatched in.
+        calls.clear()
+        monkeypatch.setattr(dry_run, "_process_one_source", _counting_wrapper(real, calls))
+        resumed = dry_run.run(prepared_config)
+        assert len(calls) == 1
+        assert len(resumed["sources"]) == 3
+        assert all(s["status"] == "ok" for s in resumed["sources"])
+
+    def test_a_failed_source_is_retried_on_the_next_run(self, monkeypatch, prepared_config):
+        _patch_chains(monkeypatch, [StubCutoutBackend()], [StubCutoutBackend()])
+        deduped = catalogue.read_votable(prepared_config.paths.deduped_catalogue)
+        victim = str(deduped["name"][0])
+
+        real = dry_run._process_one_source
+
+        def _fails_once_for_victim(row, source_name, config, optical_chain, continuum_chain, cache):
+            if str(row["name"]) == victim:
+                raise RuntimeError("simulated transient failure")
+            return real(row, source_name, config, optical_chain, continuum_chain, cache)
+
+        monkeypatch.setattr(dry_run, "_process_one_source", _fails_once_for_victim)
+        manifest = dry_run.run(prepared_config)
+        statuses = {s["name"]: s["status"] for s in manifest["sources"]}
+        assert statuses[victim] == "failed"
+
+        # Fix whatever was wrong and re-run: the previously-failed source must be
+        # retried (not skipped like an "ok" one would be), and succeed this time.
+        monkeypatch.setattr(dry_run, "_process_one_source", real)
+        resumed = dry_run.run(prepared_config)
+        resumed_statuses = {s["name"]: s["status"] for s in resumed["sources"]}
+        assert resumed_statuses[victim] == "ok"
+
+    def test_a_manifest_from_a_different_field_is_ignored_not_resumed_from(
+        self, monkeypatch, prepared_config
+    ):
+        manifest_path = prepared_config.paths.dry_run_dir / "manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "run_info": {"config_field_name": "some_other_field"},
+                    "sources": [
+                        {
+                            "name": "not a real source",
+                            "status": "ok",
+                            "png_path": "/nonexistent.png",
+                        }
+                    ],
+                }
+            )
+        )
+
+        _patch_chains(monkeypatch, [StubCutoutBackend()], [StubCutoutBackend()])
+        real = dry_run._process_one_source
+        calls: list[str] = []
+        monkeypatch.setattr(dry_run, "_process_one_source", _counting_wrapper(real, calls))
+        manifest = dry_run.run(prepared_config)
+        assert len(calls) == len(manifest["sources"])  # nothing was skipped as "already done"

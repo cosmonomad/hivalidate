@@ -76,6 +76,10 @@ class Paths:
         return self.work_dir / "combined_cat.xml"
 
     @property
+    def frequency_flux_plot(self) -> Path:
+        return self.work_dir / "frequency_flux_diagnostic.png"
+
+    @property
     def deduped_catalogue(self) -> Path:
         return self.work_dir / "deduped_cat.xml"
 

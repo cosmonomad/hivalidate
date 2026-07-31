@@ -39,6 +39,34 @@ catalogues) and vertically stacks them into one table, sorted by RA. Adds a
 `1..N` in every run (PLAN.md issue #6): `(source_run, id)` together are a stable key,
 `id` alone is not.
 
+Also writes `frequency_flux_diagnostic.png` (`hivalidate.diagnostics.build_frequency_
+flux_figure`) -- log10(integrated flux) against frequency and channel for every
+combined detection, from `legacy/plot_detections.py`'s QA plot. Channel is computed
+from frequency using a reference frequency and channel width read directly from a
+cube FITS header (`hivalidate.diagnostics.find_spectral_reference`, `CRVAL3`/
+`CDELT3` of the first `*_cubelets/*_cube.fits` file found under `raw_sofia_dir`) --
+confirmed identical across every run's cubelets, since they're all cut from the same
+parent cube. Falls back to a frequency-only plot (not an error) if no cube file with
+a recognisable frequency axis is found.
+
+This isn't the first thing that was tried: an earlier version used the catalogue's
+own `z` column directly as "channel", which looked plausible (roughly monotonic with
+frequency) but was wrong once checked against the real SB82605 data -- found live by
+inspecting the actual plot, same pattern as several other bugs in this project. `z` is
+a pixel coordinate local to each run's own input sub-cube; in this field the 45 runs
+turned out to cover 5 different sections of the frequency axis (confirmed by fitting
+freq-vs-`z` per run: identical channel width everywhere, but a different offset per
+group of ~9 runs), so the same `z` value meant a different real frequency depending
+which run a source came from, and the resulting channel axis span (roughly 0-1400)
+didn't match the field's real ~7800-channel band. `CRVAL3`/`CDELT3`, unlike `z`, are
+confirmed identical regardless of run, so a channel computed from frequency using
+them is correct no matter where in the combined catalogue a source came from.
+
+A cluster of points bunched at one frequency or channel, rather than spread roughly
+evenly across the band, usually means RFI or a bad channel range rather than real
+sources -- worth checking before spending time on dedup/rename/dry-run against a
+batch that might need re-running with different SoFiA flagging.
+
 Real run: 45 files -> 670 rows.
 
 ## Stage 2: Dedup (`hivalidate-dedup`)

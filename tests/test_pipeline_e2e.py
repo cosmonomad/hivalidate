@@ -26,6 +26,7 @@ def test_combine_dedup_rename_pipeline_end_to_end(tmp_path):
     assert config.paths.combined_catalogue.exists()
     combined = catalogue.read_votable(config.paths.combined_catalogue)
     assert len(combined) == 56  # see test_catalogue.py for how this was verified
+    assert config.paths.frequency_flux_plot.exists()  # diagnostics.py's QA plot
 
     dedup.run(config)
     assert config.paths.deduped_catalogue.exists()

@@ -21,6 +21,8 @@ before treating a reported column density as science-final.
 
 ## Installation
 
+### Option A: new environment (simplest)
+
 ```bash
 conda env create -f environment.yml
 conda activate hivalidate
@@ -29,6 +31,27 @@ conda activate hivalidate
 MontagePy ships prebuilt wheels on PyPI, but availability varies by platform/Python
 version. If `pip install MontagePy` fails, check that a wheel exists for your
 Python/OS combination before assuming something else is broken.
+
+### Option B: install into an existing environment
+
+If you already have an environment with the dependencies listed in
+`pyproject.toml`'s `[project.dependencies]` (astropy, astroquery, MontagePy,
+reproject, matplotlib, numpy, requests, PyYAML, keyring) installed -- e.g. one built
+by hand rather than from `environment.yml` -- there's no need to create a new one.
+Activate it and install `hivalidate` itself into it:
+
+```bash
+conda activate <your-existing-env>
+pip install -e . --no-deps
+```
+
+`--no-deps` skips re-resolving/installing the dependencies pip would otherwise pull in
+from `[project.dependencies]`, so it won't touch versions you've already got working
+in that environment. Drop `--no-deps` if you'd rather let pip verify/fill in anything
+missing (it will still leave already-satisfied packages alone). Either way, `-e`
+(editable) means the `hivalidate-*` console scripts (see below) pick up source changes
+without reinstalling. Verify the console scripts landed on `PATH` with
+`hivalidate-check-connectivity --help`.
 
 ## Quick start
 

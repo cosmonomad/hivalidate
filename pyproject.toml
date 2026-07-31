@@ -35,6 +35,7 @@ dev = [
 ]
 
 [project.scripts]
+hivalidate-run-pipeline = "hivalidate.cli.pipeline:main"
 hivalidate-combine = "hivalidate.cli.combine:main"
 hivalidate-dedup = "hivalidate.cli.dedup:main"
 hivalidate-rename = "hivalidate.cli.rename:main"

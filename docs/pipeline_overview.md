@@ -26,6 +26,10 @@ no stage hardcodes a field/SB name or a directory layout. This is the fix for th
 legacy scripts' central problem (PLAN.md issue #9): each one had its own hardcoded
 constants that had to be kept in sync by hand across nine separate files.
 
+`hivalidate-run-pipeline --mode dry-run` and `--mode qa` chain stages 0-4 and 5-6
+respectively, so the two commands you actually run (one on HPC, one locally) map
+directly onto this diagram's HPC/local split instead of six separate invocations.
+
 ## Stage 1: Combine (`hivalidate-combine`)
 
 Reads every `*_cat.xml` under `paths.raw_sofia_dir` (SoFiA's own per-run VOTable

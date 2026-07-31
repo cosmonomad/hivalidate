@@ -55,7 +55,8 @@ without reinstalling. Verify the console scripts landed on `PATH` with
 
 ## Quick start
 
-Against the example data in `data/run_sofia/` (see `configs/SB82605.yaml`):
+Against the example data in `data/run_sofia/` (see `configs/SB82605.yaml`), running
+each stage individually:
 
 ```bash
 hivalidate-check-connectivity --config configs/SB82605.yaml   # verify backends first
@@ -72,6 +73,24 @@ back-to-back in one session -- dry-run in particular is meant to run unattended 
 HPC compute node, with QA picking up its output later on a machine with a display.
 See [`docs/pipeline_overview.md`](docs/pipeline_overview.md) for what each stage
 reads/writes and why.
+
+Or, the same six stages via one orchestration command, `hivalidate-run-pipeline`,
+split at the same HPC/local boundary:
+
+```bash
+# On the HPC compute node: check-connectivity, combine, dedup, rename, dry-run.
+hivalidate-run-pipeline --config configs/SB82605.yaml --mode dry-run
+
+# Later, locally (after dry_run/manifest.json has made it onto this machine): qa, postprocess.
+hivalidate-run-pipeline --config configs/SB82605.yaml --mode qa
+```
+
+`--mode qa` never reruns combine/dedup/rename/dry-run -- it requires
+`dry_run/manifest.json` to already exist (produced by `--mode dry-run`, or the
+individual stages) and fails with a clear message naming the command to run first if
+it doesn't. If QA is interrupted partway through (Ctrl-C), it saves progress and skips
+postprocess; re-running the same command resumes QA (skipping already-reviewed
+sources) and continues on to postprocess once it's done.
 
 ## Configuration
 
@@ -186,6 +205,7 @@ Never put credentials in a config file that gets committed to git.
 | Dry-run | `hivalidate-dry-run` | Batch-generate validation plots, HPC-safe (`Agg`, no prompts) |
 | QA | `hivalidate-qa` | Interactive review of dry-run output; run locally, not on HPC |
 | Post-process | `hivalidate-postprocess` | Validation CSV, extract true cubelets, mosaic |
+| Whole pipeline | `hivalidate-run-pipeline --mode dry-run` / `--mode qa` | Runs the stages above in sequence, split at the HPC/local boundary |
 
 ## Development
 

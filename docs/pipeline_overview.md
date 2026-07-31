@@ -112,17 +112,59 @@ Reads only `manifest.json` and the PNGs dry-run already produced -- never re-fet
 a cutout or regenerates a figure, which is what lets it run somewhere with an actual
 display (a laptop) independent of where dry-run ran. For each source: shows the PNG,
 prompts for a quality flag (`t`/`f`/`u`/`d` = true/false/uncertain/duplicate, matching
-the legacy script's numeric convention for continuity) and an optional comment.
+the legacy script's numeric convention for continuity), plus two session-control
+letters, `b` (back) and `q` (save & quit), and an optional comment.
+
+The letter typed at the prompt is stored numerically in the `qa` column of
+`validated_cat.xml`/`.csv` (`qa.FLAG_TO_NUMERIC`), unreviewed sources getting `NaN`.
+`b` and `q` never appear in `qa` themselves -- they control the session, they aren't
+a verdict about the source on screen:
+
+| Flag | Meaning         | `qa` value                            |
+|------|-----------------|----------------------------------------|
+| `t`  | true            | `1.0`                                  |
+| `f`  | false           | `0.0`                                  |
+| `u`  | uncertain       | `2.0`                                  |
+| `d`  | duplicate       | `3.0`                                  |
+| `b`  | back            | n/a -- re-opens the previous source    |
+| `q`  | save & quit     | n/a -- ends the session early          |
 
 - **Resumable**: every flag is written to `qa_results.json` immediately, not batched
   to the end. Re-running the command skips anything already reviewed.
-- **`b` (back)**: re-opens the previous source, discarding its saved flag, so a
-  mis-keyed answer doesn't require restarting the session.
+- **`b` (back)**: typed at the flag prompt (in place of `t`/`f`/`u`/`d`/`q`), instead
+  of answering for the *current* source it discards the *previous* source's saved
+  flag/comment and re-displays that source so you can answer again -- for a
+  mis-keyed answer that doesn't require restarting the session. Each `b` steps back
+  exactly one source and can be chained (`b` three times in a row steps back three
+  sources); it's a no-op, not a crash, if there's no previous source to go back to
+  (the very first source of the session).
+- **`q` (save & quit)**: stops the review loop before reaching the end of the
+  catalogue -- not needed to avoid losing work (every flag is already saved
+  immediately, per "Resumable" above), just to end the session on your own terms.
+  Re-running `hivalidate-qa` (or `--mode qa`) afterward resumes right where you quit.
 - Writes `validated_cat.xml` and `validated_cat.csv` (identical content, VOTable and
   plain CSV) -- the deduped catalogue plus `qa`, `qa_comment`, and the
-  optical/continuum provenance pulled from the manifest -- after every session, even
-  a partial one -- unreviewed sources get `NaN`/empty rather than blocking the file
-  from being written at all.
+  optical/continuum provenance pulled from the manifest -- once the session ends,
+  including a partial one ended by `q` -- unreviewed sources get `NaN`/empty rather
+  than blocking the file from being written at all. Note this is a different case
+  from Ctrl-C: an interrupt is caught and logged, but skips this write entirely (see
+  `qa_results.json` under "Resumable" for what *is* saved from an interrupted
+  session) -- re-run the same command to reach a clean `q` (or the natural end of the
+  catalogue) and get `validated_cat.xml`/`.csv` written.
+- **`optical_provenance`/`continuum_provenance`** record which cutout backend (and,
+  for some backends, which specific survey/file) actually supplied that source's
+  image -- e.g. `skyview:DSS2 Red`, `legacy_survey:ls-dr9`, `local:field_mosaic.fits`,
+  `racs_casda:RACS-DR1_....fits` -- or empty if every backend in that source's
+  fallback chain failed (dry-run degrades to a blank panel rather than failing the
+  whole source). `cutouts.optical_priority`/`continuum_priority` in the field config
+  is a *fallback chain*, so two sources in the same batch can silently come from
+  different backends if the first choice failed only for one of their positions (an
+  outage, a coverage gap, a cache miss) -- a panel that looks different from its
+  neighbours may just be a different survey with different depth/resolution, not
+  something astrophysical. Carrying provenance straight through from
+  `manifest.json` into the final catalogue means a surprising flag can be explained
+  later ("only had a shallower Legacy Survey image, not SkyView") without digging
+  through logs.
 
 ## Stage 6: Post-process (`hivalidate-postprocess`)
 

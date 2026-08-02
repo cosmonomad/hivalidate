@@ -204,7 +204,7 @@ Never put credentials in a config file that gets committed to git.
 | Rename | `hivalidate-rename` | Map per-run numeric IDs to source names, copy cubelets |
 | Dry-run | `hivalidate-dry-run` | Batch-generate validation plots, HPC-safe (`Agg`, no prompts) |
 | QA | `hivalidate-qa` | Interactive review of dry-run output; run locally, not on HPC |
-| Post-process | `hivalidate-postprocess` | Validation CSV, extract true cubelets, mosaic |
+| Post-process | `hivalidate-postprocess` | Per-class (true/false/uncertain/duplicate) CSV, cubelets, plots; true-only mosaic |
 | Whole pipeline | `hivalidate-run-pipeline --mode dry-run` / `--mode qa` | Runs the stages above in sequence, split at the HPC/local boundary |
 
 ## Development

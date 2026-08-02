@@ -1,13 +1,17 @@
 """Post-validation artifacts built from the QA output (`validated_cat.xml`):
 
-- A CSV of just the true-flagged sources -- replaces `legacy/create_validation_csv.py`,
+- A CSV of each reviewed class's sources -- replaces `legacy/create_validation_csv.py`,
   much simpler now: that script had to reverse-engineer which sources were "true" by
   scanning a directory of PNG filenames and cross-referencing the SoFiA catalogue,
   because the legacy interactive script never wrote the qa flag anywhere durable
   alongside the catalogue. `validated_cat.xml` already has the `qa` column directly.
-- A directory of just their cubelets -- replaces `legacy/extract_true_cubelets.py`.
-- A mosaic FITS of just their moment-0 maps, reprojected onto the full field --
-  replaces `legacy/mosaic_sofia_true_detections.py`.
+- A directory of just that class's cubelets -- replaces `legacy/extract_true_cubelets.py`.
+- A directory of just that class's dry-run validation plots, pulled out of the shared
+  flat `dry_run/` directory -- so, e.g., every "uncertain" or "duplicate" source can be
+  flicked back through later without hunting through hundreds of unrelated PNGs.
+- A mosaic FITS of the true class's moment-0 maps, reprojected onto the full field --
+  replaces `legacy/mosaic_sofia_true_detections.py`. True-only: "where are the real
+  detections" is the only one of these four classes that question makes sense for.
 """
 
 from __future__ import annotations
@@ -26,6 +30,18 @@ from hivalidate import catalogue
 
 #: Matches hivalidate.qa.FLAG_TO_NUMERIC's convention.
 QA_TRUE = 1.0
+QA_FALSE = 0.0
+QA_UNCERTAIN = 2.0
+QA_DUPLICATE = 3.0
+
+#: Every reviewed class postprocess builds a catalogue/cubelets/plots set for, keyed
+#: by the subdirectory name it's written under (`postprocess/<class_name>/`).
+QA_CLASSES = {
+    "true": QA_TRUE,
+    "false": QA_FALSE,
+    "uncertain": QA_UNCERTAIN,
+    "duplicate": QA_DUPLICATE,
+}
 
 
 def filter_by_qa(validated_catalogue: Table, qa_values: set[float]) -> Table:
@@ -59,6 +75,28 @@ def extract_cubelets(cubelets_dir: str | Path, output_dir: str | Path, names: li
     for name in names:
         prefix = str(name).replace(" ", "_")
         for source_path in cubelets_dir.glob(f"{prefix}_*"):
+            shutil.copy2(source_path, output_dir / source_path.name)
+            count += 1
+    return count
+
+
+def extract_plots(dry_run_dir: str | Path, output_dir: str | Path, names: list[str]) -> int:
+    """Copy each of `names`' dry-run validation PNG (`hivalidate.cli.dry_run` writes
+    exactly one, `<source_name>.png`, per source -- unlike cubelets, no glob needed)
+    from `dry_run_dir` into `output_dir`. Returns the number of files copied.
+
+    A name with no matching PNG (source failed dry-run, or was never processed)
+    contributes zero rather than raising -- a partially-completed dry-run batch is a
+    normal state to postprocess against, not an error.
+    """
+    dry_run_dir = Path(dry_run_dir)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    count = 0
+    for name in names:
+        source_path = dry_run_dir / f"{str(name).replace(' ', '_')}.png"
+        if source_path.exists():
             shutil.copy2(source_path, output_dir / source_path.name)
             count += 1
     return count

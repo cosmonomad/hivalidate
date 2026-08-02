@@ -115,6 +115,30 @@ class TestExtractCubelets:
         assert copied.read_bytes() == original.read_bytes()
 
 
+class TestExtractPlots:
+    def test_copies_matching_pngs_for_given_names(self, tmp_path):
+        dry_run_dir = tmp_path / "dry_run"
+        dry_run_dir.mkdir()
+        (dry_run_dir / "SoFiA_J000000.00-300000.0.png").write_bytes(b"fake-png-bytes")
+        (dry_run_dir / "SoFiA_J000001.00-300000.0.png").write_bytes(b"other-png-bytes")
+        output_dir = tmp_path / "true_plots"
+
+        count = postprocess.extract_plots(dry_run_dir, output_dir, ["SoFiA J000000.00-300000.0"])
+
+        assert count == 1
+        copied = list(output_dir.iterdir())
+        assert len(copied) == 1
+        assert copied[0].name == "SoFiA_J000000.00-300000.0.png"
+        assert copied[0].read_bytes() == b"fake-png-bytes"
+
+    def test_unmatched_name_contributes_zero_files_not_an_error(self, tmp_path):
+        dry_run_dir = tmp_path / "dry_run"
+        dry_run_dir.mkdir()
+        output_dir = tmp_path / "true_plots"
+        count = postprocess.extract_plots(dry_run_dir, output_dir, ["SoFiA J999999.99-999999.9"])
+        assert count == 0
+
+
 @pytest.fixture
 def field_mosaic_file(tmp_path):
     wcs = WCS(naxis=2)

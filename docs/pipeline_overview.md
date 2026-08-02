@@ -15,7 +15,7 @@ flowchart TD
     C -->|hivalidate-rename| D["cubelets/<br/>5824 renamed files"]
     D -->|hivalidate-dry-run| E["dry_run/<br/>448 PNGs + manifest.json"]
     E -->|hivalidate-qa| F["qa/<br/>validated_cat.xml + .csv"]
-    F -->|hivalidate-postprocess| G["postprocess/<br/>CSV + true cubelets + mosaic"]
+    F -->|hivalidate-postprocess| G["postprocess/&lt;class&gt;/<br/>CSV + cubelets + plots (+ mosaic for true)"]
 
     H[SkyView / Legacy Survey] -.optical cutout.-> E
     I[Local continuum mosaic / RACS+CASDA] -.continuum cutout.-> E
@@ -196,14 +196,26 @@ a verdict about the source on screen:
 
 ## Stage 6: Post-process (`hivalidate-postprocess`)
 
-Filters `validated_cat.xml` to `qa == 1.0` (true) sources and writes:
+Filters `validated_cat.xml` by `qa` value into every reviewed class -- true (`1.0`),
+false (`0.0`), uncertain (`2.0`), duplicate (`3.0`) -- and, for each one, writes its
+own `postprocess/<class>/` subdirectory:
 
-- `validated_true.csv` -- just those rows, in plain CSV.
-- `true_cubelets/` -- their cubelet files only.
-- `mosaic_true.fits` -- their moment-0 maps reprojected onto `paths.field_mosaic`
-  (SoFiA's own full-field mosaic), via `reproject.mosaicking.reproject_and_coadd`, so
-  true detections can be inspected in context. Skipped (not an error) if
-  `field_mosaic` isn't configured for a field.
+- `validated_<class>.csv` -- just that class's rows, in plain CSV.
+- `cubelets/` -- that class's cubelet files only, pulled from `cubelets/`.
+- `plots/` -- that class's dry-run validation PNGs, pulled out of the shared flat
+  `dry_run/` directory. This is what makes it practical to flick back through, say,
+  every "uncertain" source later without hunting through hundreds of unrelated PNGs
+  for sources that were already resolved one way or the other.
+
+A class with zero matching sources still gets its own (empty) CSV/cubelets/plots
+directories, so a partially-reviewed catalogue is a normal input, not an error.
+
+`postprocess/true/mosaic_true.fits` is the one class-specific extra: the true class's
+moment-0 maps reprojected onto `paths.field_mosaic` (SoFiA's own full-field mosaic),
+via `reproject.mosaicking.reproject_and_coadd`, so true detections can be inspected in
+context. Built only for the true class ("where are the real detections" doesn't apply
+to the other three) and skipped entirely (not an error) if `field_mosaic` isn't
+configured for a field.
 
 ## Design decisions worth knowing about
 

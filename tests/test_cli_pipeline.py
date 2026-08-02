@@ -135,7 +135,7 @@ class TestQaMode:
 
         assert (config.paths.qa_dir / "validated_cat.xml").exists()
         assert (config.paths.qa_dir / "validated_cat.csv").exists()
-        assert (config.paths.postprocess_dir / "validated_true.csv").exists()
+        assert (config.paths.postprocess_dir / "true" / "validated_true.csv").exists()
         validated = catalogue.read_votable(config.paths.qa_dir / "validated_cat.xml")
         assert all(v == 1.0 for v in validated["qa"])
 
@@ -163,7 +163,7 @@ class TestQaMode:
         monkeypatch.setattr(qa, "default_prompt", lambda source, position, total: next(responses))
 
         pipeline.run_qa_mode(config)
-        assert (config.paths.postprocess_dir / "validated_true.csv").exists()
+        assert (config.paths.postprocess_dir / "true" / "validated_true.csv").exists()
 
 
 class TestMainDispatch:
@@ -183,6 +183,4 @@ class TestMainDispatch:
 
     def test_rejects_an_invalid_mode(self, capsys):
         with pytest.raises(SystemExit):
-            pipeline.main(
-                ["--config", str(FIXTURES / "config_mini.yaml"), "--mode", "bogus"]
-            )
+            pipeline.main(["--config", str(FIXTURES / "config_mini.yaml"), "--mode", "bogus"])

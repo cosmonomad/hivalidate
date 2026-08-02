@@ -37,7 +37,7 @@ class CutoutUnavailable(Exception):
 class CutoutResult:
     data: np.ndarray
     wcs: WCS
-    provenance: str  # e.g. "skyview:DSS2 Red", "racs_casda:RACS-DR1_..."
+    provenance: str  # e.g. "skyview:DSS2 Red", "legacy_survey:ls-dr9", "local", "racs"
 
 
 class CutoutBackend(ABC):
@@ -160,9 +160,7 @@ def retry_with_backoff(
             return fn()
         except retryable_exceptions as exc:
             if attempt == max_retries - 1:
-                raise CutoutUnavailable(
-                    f"Failed after {max_retries} attempts: {exc}"
-                ) from exc
+                raise CutoutUnavailable(f"Failed after {max_retries} attempts: {exc}") from exc
             wait_s = base_delay_s * (2**attempt)
             logger.warning(
                 "Attempt %d/%d failed (%s), retrying in %.1fs",

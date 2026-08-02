@@ -114,9 +114,11 @@ class LocalContinuumBackend(CutoutBackend):
         # .celestial strips those so the WCS matches the data's actual dimensionality
         # (found live 2026-07-30: plotting a local continuum cutout with the raw,
         # non-celestial WCS raised "WCS has more than 2 pixel dimensions").
-        return CutoutResult(
-            data=data, wcs=WCS(header).celestial, provenance=f"local:{infile.name}"
-        )
+        # Just "local", not the actual filename -- real filenames here are the raw
+        # ASKAP continuum image name (e.g.
+        # "image.i.WALLABY_2051-53B.SB82605.cont.taylor.0.restored.conv.fits"),
+        # too long to be useful in a panel title or a catalogue column.
+        return CutoutResult(data=data, wcs=WCS(header).celestial, provenance="local")
 
     def is_available(self) -> tuple[bool, str]:
         try:
@@ -251,8 +253,9 @@ class RacsCasdaBackend(CutoutBackend):
                 f"Expected a 2D cutout after squeezing degenerate axes, got shape {data.shape}"
             )
 
-        provenance = f"racs_casda:{subset['filename'][0]}"
-        return CutoutResult(data=data, wcs=WCS(header).celestial, provenance=provenance)
+        # Just "racs", not the actual CASDA filename (e.g. "RACS-DR1_0000+00A.fits")
+        # -- too long to be useful in a panel title or a catalogue column.
+        return CutoutResult(data=data, wcs=WCS(header).celestial, provenance="racs")
 
     def is_available(self) -> tuple[bool, str]:
         try:

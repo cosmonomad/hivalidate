@@ -84,7 +84,7 @@ class TestLocalContinuumBackend:
         result = backend.fetch(FIELD_CENTRE, size_arcsec)
         assert result.data.ndim == 2
         assert 15 <= result.data.shape[0] <= 25  # mSubimage's own rounding, not exact
-        assert result.provenance == "local:mini_continuum.fits"
+        assert result.provenance == "local"
         # Regression check: the WCS must be 2D too (matching the data), not the raw
         # 4D WCS from the input mosaic -- this is what broke WCSAxes plotting live.
         assert result.wcs.pixel_n_dim == 2
@@ -259,7 +259,14 @@ class TestRacsCasdaBackendFetchMocked:
         )
         backend = RacsCasdaBackend()
         result = backend.fetch(FIELD_CENTRE, size_arcsec=60.0)
-        assert result.provenance == "racs_casda:RACS-DR1_0000+00A.fits"
+
+        # provenance itself is just "racs" now (too long to carry the actual CASDA
+        # filename) -- confirm the filtering picked the right row a different way:
+        # the table actually handed to Casda.cutout() must contain only the matching
+        # RACS row, not the "Some Other Survey" one.
+        called_table = fake_casda_class.instances[0].cutout_calls[0][0]
+        assert list(called_table["filename"]) == ["RACS-DR1_0000+00A.fits"]
+        assert result.provenance == "racs"
 
     def test_squeezes_degenerate_stokes_and_frequency_axes_to_2d(
         self, monkeypatch, fake_casda_class

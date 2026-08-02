@@ -180,9 +180,11 @@ a verdict about the source on screen:
   session) -- re-run the same command to reach a clean `q` (or the natural end of the
   catalogue) and get `validated_cat.xml`/`.csv` written.
 - **`optical_provenance`/`continuum_provenance`** record which cutout backend (and,
-  for some backends, which specific survey/file) actually supplied that source's
-  image -- e.g. `skyview:DSS2 Red`, `legacy_survey:ls-dr9`, `local:field_mosaic.fits`,
-  `racs_casda:RACS-DR1_....fits` -- or empty if every backend in that source's
+  for the optical backends, which specific survey) actually supplied that source's
+  image -- e.g. `skyview:DSS2 Red`, `legacy_survey:ls-dr9` for optical, just `local`
+  or `racs` for continuum (the actual filenames there are long, uninformative ASKAP
+  image names, not worth carrying into a panel title or a catalogue column) -- or
+  empty if every backend in that source's
   fallback chain failed (dry-run degrades to a blank panel rather than failing the
   whole source). `cutouts.optical_priority`/`continuum_priority` in the field config
   is a *fallback chain*, so two sources in the same batch can silently come from

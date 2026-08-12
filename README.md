@@ -21,6 +21,18 @@ before treating a reported column density as science-final.
 
 ## Installation
 
+### Get the code
+
+```bash
+git clone https://github.com/cosmonomad/hivalidate.git
+cd hivalidate
+```
+
+No credentials needed -- it's a public repo. If this fails on an HPC login/compute
+node, that machine likely has no outbound internet access to github.com at all, and
+you'll need to get the code across some other way (e.g. `rsync`/`scp` from a machine
+that does).
+
 ### Option A: new environment (simplest)
 
 ```bash

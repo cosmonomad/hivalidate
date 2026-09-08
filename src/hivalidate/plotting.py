@@ -20,6 +20,9 @@ values that only happened to suit one specific field/SB:
 - Provenance (which optical/continuum backend actually supplied each cutout) is
   annotated directly on the figure, since there are now multiple possible sources
   per panel (PLAN.md section 5, "Provenance").
+- The optical panel displays an RGB cutout (`optical.data.ndim == 3`) as-is, with no
+  greyscale vmin/vmax applied -- see `cutouts/optical.py`'s `LegacySurveyBackend`,
+  whose grz Lupton composite already comes correctly coloured and stretched.
 
 Every sky panel (optical, continuum, mom0, mom1) is pinned to the same real
 angular field of view, computed from the mom0 image's own WCS
@@ -206,15 +209,23 @@ def build_validation_figure(
     # --- panel 1: optical + mom0 contours ---
     ax_opt = fig.add_subplot(231, projection=display_wcs)
     if optical is not None:
-        vmin, vmax = _robust_vlim(optical.data)
-        ax_opt.imshow(
-            optical.data,
-            origin="lower",
-            interpolation="nearest",
-            cmap="Greys",
-            vmin=vmin,
-            vmax=vmax,
-        )
+        if optical.data.ndim == 3:
+            # An RGB composite (currently only LegacySurveyBackend's grz Lupton
+            # composite -- see cutouts/optical.py) already comes pre-stretched and
+            # colour-balanced; re-applying our own greyscale vmin/vmax on top would
+            # both discard its colour and redo a worse version of the stretch it
+            # already did.
+            ax_opt.imshow(optical.data, origin="lower", interpolation="nearest")
+        else:
+            vmin, vmax = _robust_vlim(optical.data)
+            ax_opt.imshow(
+                optical.data,
+                origin="lower",
+                interpolation="nearest",
+                cmap="Greys",
+                vmin=vmin,
+                vmax=vmax,
+            )
         ax_opt.contour(
             col_density_map, levels=contour_levels_scaled, transform=ax_opt.get_transform(mom0_wcs)
         )

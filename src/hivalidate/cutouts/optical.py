@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import io
 
+import numpy as np
 import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from astropy.visualization import make_lupton_rgb
 from astropy.wcs import WCS
 from astroquery.skyview import SkyView
 
@@ -98,9 +100,18 @@ class SkyViewBackend(CutoutBackend):
 
 class LegacySurveyBackend(CutoutBackend):
     """DESI Legacy Imaging Surveys cutout service (`legacysurvey.org/viewer`),
-    migrated from `legacy/download_legacy.py`. Single-band FITS (not the RGB
-    composite the legacy script also produced -- this backend only needs a 2D array +
-    WCS to match `SkyViewBackend`'s output shape for the same validation-plot panel).
+    migrated from `legacy/download_legacy.py`. Requests the grz multi-band FITS cube
+    and builds the same kind of RGB composite the legacy script produced (via
+    `astropy.visualization.make_lupton_rgb`), rather than a single band rendered as
+    greyscale -- both because grz *is* what the Legacy Survey viewer itself shows as
+    a colour composite, and because the Lupton stretch is asinh-based: it compresses
+    bright pixels into the display range instead of letting them dominate it, which
+    a single band under a linear stretch (`plotting._robust_vlim`'s mean +/- n*std)
+    can't avoid -- a bright star/galaxy in frame was making real but fainter
+    structure in the rest of the cutout invisible.
+
+    Band-to-channel mapping matches both the legacy script and the official viewer's
+    own convention: reddest band (z) -> Red channel, g -> Blue.
 
     Coverage is a known simplification: the real Legacy Survey footprint (DECaLS +
     MzLS/BASS + DES, per layer) is not a simple declination cut, and no attempt is
@@ -116,17 +127,23 @@ class LegacySurveyBackend(CutoutBackend):
     #: to skip an obviously-hopeless request for a northern position.
     APPROX_DEC_CEILING_DEG = 34.0
 
+    #: Requested in this order; the cutout API returns the cube's leading axis in
+    #: the same order. g -> Blue, r -> Green, z -> Red (see class docstring).
+    BANDS = "grz"
+
     def __init__(
         self,
         layer: str = "ls-dr10",
         pixscale_arcsec: float = 0.262,
-        band: str = "r",
         max_retries: int = 5,
+        stretch: float = 0.5,
+        q: float = 10,
     ):
         self.layer = layer
         self.pixscale_arcsec = pixscale_arcsec
-        self.band = band
         self.max_retries = max_retries
+        self.stretch = stretch
+        self.q = q
 
     def check_coverage(self, position: SkyCoord) -> bool:
         return position.dec.deg < self.APPROX_DEC_CEILING_DEG
@@ -137,7 +154,7 @@ class LegacySurveyBackend(CutoutBackend):
             "https://www.legacysurvey.org/viewer/cutout.fits?"
             f"ra={position.ra.deg}&dec={position.dec.deg}&"
             f"size={n_pix}&pixscale={self.pixscale_arcsec}&"
-            f"layer={self.layer}&bands={self.band}"
+            f"layer={self.layer}&bands={self.BANDS}"
         )
 
         def _get():
@@ -163,20 +180,31 @@ class LegacySurveyBackend(CutoutBackend):
 
         try:
             with fits.open(io.BytesIO(response.content)) as hdul:
-                data = hdul[0].data
+                cube = hdul[0].data
                 header = hdul[0].header
         except OSError as exc:
             raise CutoutUnavailable(
                 f"Legacy Survey response was not a valid FITS file: {exc}"
             ) from exc
 
-        if data is None or not (data != 0).any():
+        if cube is None or cube.ndim != 3 or cube.shape[0] != len(self.BANDS):
+            shape = None if cube is None else cube.shape
+            raise CutoutUnavailable(
+                f"Legacy Survey response was not the expected {self.BANDS} band cube "
+                f"(got shape {shape})"
+            )
+        if not (cube != 0).any():
             # An all-zero cutout is what the service returns for a position outside
             # its actual imaged footprint -- this is the authoritative coverage check
             # `check_coverage`'s declination heuristic can't fully replace.
             raise CutoutUnavailable(f"No {self.layer} coverage at this position (empty cutout)")
 
-        return CutoutResult(data=data, wcs=WCS(header), provenance=f"legacy_survey:{self.layer}")
+        g, r, z = (np.nan_to_num(cube[i]) for i in range(3))
+        rgb = make_lupton_rgb(z, r, g, stretch=self.stretch, Q=self.q)
+
+        return CutoutResult(
+            data=rgb, wcs=WCS(header).celestial, provenance=f"legacy_survey:{self.layer}"
+        )
 
     def is_available(self) -> tuple[bool, str]:
         try:

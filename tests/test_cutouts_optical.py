@@ -99,6 +99,10 @@ class TestSkyViewBackendMocked:
         assert result.provenance == "skyview:DSS2 Red"
 
 
+def _fake_grz_cube(size=10, fill=1.0):
+    return np.full((3, size, size), fill)
+
+
 class TestLegacySurveyBackendMocked:
     def test_check_coverage_rejects_far_northern_declination(self):
         backend = LegacySurveyBackend()
@@ -112,16 +116,29 @@ class TestLegacySurveyBackendMocked:
         def fake_get(url, timeout):
             captured["url"] = url
             buf = io.BytesIO()
-            fits.writeto(buf, np.ones((10, 10)), overwrite=True)
+            fits.writeto(buf, _fake_grz_cube(), overwrite=True)
             return _FakeResponse(200, buf.getvalue())
 
         monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
-        backend = LegacySurveyBackend(layer="ls-dr10", pixscale_arcsec=0.262, band="r")
+        backend = LegacySurveyBackend(layer="ls-dr10", pixscale_arcsec=0.262)
         backend.fetch(POSITION, size_arcsec=26.2)
         assert "layer=ls-dr10" in captured["url"]
-        assert "bands=r" in captured["url"]
+        assert "bands=grz" in captured["url"]
         assert f"ra={POSITION.ra.deg}" in captured["url"]
         assert "size=100" in captured["url"]  # 26.2 / 0.262
+
+    def test_fetch_returns_an_rgb_composite(self, monkeypatch):
+        def fake_get(url, timeout):
+            buf = io.BytesIO()
+            fits.writeto(buf, _fake_grz_cube(), overwrite=True)
+            return _FakeResponse(200, buf.getvalue())
+
+        monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
+        backend = LegacySurveyBackend()
+        result = backend.fetch(POSITION, size_arcsec=26.2)
+        assert result.data.ndim == 3
+        assert result.data.shape[-1] == 3
+        assert result.data.shape[:2] == (10, 10)
 
     def test_client_error_status_fails_immediately_without_retrying(self, monkeypatch):
         # A 4xx is never fixed by retrying -- assert it does NOT sleep/retry, by not
@@ -165,7 +182,7 @@ class TestLegacySurveyBackendMocked:
             if attempts["n"] < 2:
                 return _FakeResponse(503, b"")
             buf = io.BytesIO()
-            fits.writeto(buf, np.ones((10, 10)), overwrite=True)
+            fits.writeto(buf, _fake_grz_cube(), overwrite=True)
             return _FakeResponse(200, buf.getvalue())
 
         monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
@@ -177,7 +194,7 @@ class TestLegacySurveyBackendMocked:
     def test_all_zero_data_raises_cutout_unavailable_not_covered(self, monkeypatch):
         def fake_get(url, timeout):
             buf = io.BytesIO()
-            fits.writeto(buf, np.zeros((10, 10)), overwrite=True)
+            fits.writeto(buf, _fake_grz_cube(fill=0.0), overwrite=True)
             return _FakeResponse(200, buf.getvalue())
 
         monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
@@ -223,7 +240,7 @@ class TestOpticalBackendsLive:
         # checked during development to actually have Legacy Survey imaging.
         backend = LegacySurveyBackend()
         result = backend.fetch(POSITION, size_arcsec=26.2)
-        assert result.data.shape == (100, 100)
+        assert result.data.shape == (100, 100, 3)
         assert result.provenance.startswith("legacy_survey:")
 
     def test_skyview_is_available_reports_ok(self):

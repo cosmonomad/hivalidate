@@ -20,9 +20,6 @@ values that only happened to suit one specific field/SB:
 - Provenance (which optical/continuum backend actually supplied each cutout) is
   annotated directly on the figure, since there are now multiple possible sources
   per panel (PLAN.md section 5, "Provenance").
-- The optical panel displays an RGB cutout (`optical.data.ndim == 3`) as-is, with no
-  greyscale vmin/vmax applied -- see `cutouts/optical.py`'s `LegacySurveyBackend`,
-  whose grz Lupton composite already comes correctly coloured and stretched.
 
 Every sky panel (optical, continuum, mom0, mom1) is pinned to the same real
 angular field of view, computed from the mom0 image's own WCS
@@ -50,7 +47,9 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.cosmology import Cosmology
 from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
 from astropy.table import Row, Table
+from astropy.visualization import AsinhStretch, ImageNormalize, ManualInterval
 from astropy.wcs import WCS
 from matplotlib.figure import Figure
 from matplotlib.patches import Ellipse
@@ -166,6 +165,54 @@ def _robust_vlim(data: np.ndarray, n_sigma: float = 3.0) -> tuple[float, float]:
     return finite.mean() - n_sigma * finite.std(), finite.mean() + n_sigma * finite.std()
 
 
+#: vmax = background median + this many sigma-clipped background sigmas; vmin = median
+#: - 1 sigma. Picked by comparing a grid of values (10-80) against a real bright
+#: spiral galaxy cutout (dev session 2026-09-08): below ~30, the galaxy's own core
+#: saturates to a solid black blob and its spiral structure disappears; 50 keeps that
+#: structure visible as grey gradients while a fainter starfield elsewhere still shows
+#: plenty of faint detail.
+_OPTICAL_VMAX_SIGMA = 50.0
+
+
+def _optical_norm(data: np.ndarray) -> ImageNormalize:
+    """A background-anchored asinh normalization for the optical panel, instead of
+    `_robust_vlim`'s linear mean +/- n*std. Real optical images have most of their
+    dynamic range in a handful of bright-star pixels -- under a linear stretch those
+    inflate the std enough that faint galaxies/background structure (the whole point
+    of `LegacySurveyBackend`'s multi-band S/N combination, see cutouts/optical.py)
+    get compressed into a nearly uniform grey and become hard to see. asinh is
+    linear near zero (so faint signal still shows contrast) and logarithmic at the
+    high end (so it doesn't need a bright star's peak to set the whole scale).
+
+    vmin/vmax come from `sigma_clipped_stats`'s background median/std, not a
+    data-driven interval like `PercentileInterval` or `ZScaleInterval` -- both were
+    tried first and both back-fired:
+
+    - `PercentileInterval(99.5)` (the original version) is a plain percentile: a big
+      enough saturated/bloomed star can cover more than 0.5% of a cutout's pixels and
+      drag vmax up on its own (confirmed with a synthetic saturated patch: vmax
+      jumped >3x and visibly washed out the whole image).
+    - `ZScaleInterval` (the IRAF/DS9 algorithm) fixed that, but its vmin/vmax aren't
+      anchored to the real background level -- on a real cutout its vmin sat well
+      below the background median, which pushed the *background itself* substantially
+      up the display range, making everything darker overall and, on a bright galaxy,
+      leaving much less headroom before its core saturated to a solid black blob
+      (losing spiral structure -- direct user feedback after the zscale version).
+
+    Since vmin/vmax here are derived purely from robust background statistics and
+    never look at the actual data extremes, a saturated star of any brightness cannot
+    move them at all -- strictly more robust than zscale, not just as robust.
+    """
+    _, median, bg_std = sigma_clipped_stats(data, sigma=3.0, maxiters=5)
+    if np.isfinite(bg_std) and bg_std > 0:
+        vmin = median - 1.0 * bg_std
+        vmax = median + _OPTICAL_VMAX_SIGMA * bg_std
+        a = np.clip(bg_std / (vmax - vmin), 0.005, 0.5)
+    else:
+        vmin, vmax, a = 0.0, 1.0, 0.1  # degenerate (e.g. uniform test) data
+    return ImageNormalize(data, interval=ManualInterval(vmin, vmax), stretch=AsinhStretch(a=a))
+
+
 def build_validation_figure(
     row: Row,
     cubelets: SourceCubelets,
@@ -209,23 +256,13 @@ def build_validation_figure(
     # --- panel 1: optical + mom0 contours ---
     ax_opt = fig.add_subplot(231, projection=display_wcs)
     if optical is not None:
-        if optical.data.ndim == 3:
-            # An RGB composite (currently only LegacySurveyBackend's grz Lupton
-            # composite -- see cutouts/optical.py) already comes pre-stretched and
-            # colour-balanced; re-applying our own greyscale vmin/vmax on top would
-            # both discard its colour and redo a worse version of the stretch it
-            # already did.
-            ax_opt.imshow(optical.data, origin="lower", interpolation="nearest")
-        else:
-            vmin, vmax = _robust_vlim(optical.data)
-            ax_opt.imshow(
-                optical.data,
-                origin="lower",
-                interpolation="nearest",
-                cmap="Greys",
-                vmin=vmin,
-                vmax=vmax,
-            )
+        ax_opt.imshow(
+            optical.data,
+            origin="lower",
+            interpolation="nearest",
+            cmap="Greys",
+            norm=_optical_norm(optical.data),
+        )
         ax_opt.contour(
             col_density_map, levels=contour_levels_scaled, transform=ax_opt.get_transform(mom0_wcs)
         )

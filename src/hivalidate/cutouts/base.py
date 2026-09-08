@@ -35,8 +35,6 @@ class CutoutUnavailable(Exception):
 
 @dataclass
 class CutoutResult:
-    # 2D (ny, nx) for a single-band backend (skyview, local, racs), or 3D (ny, nx, 3)
-    # uint8 RGB for a colour composite (legacy_survey's grz Lupton composite).
     data: np.ndarray
     wcs: WCS
     provenance: str  # e.g. "skyview:DSS2 Red", "legacy_survey:ls-dr9", "local", "racs"

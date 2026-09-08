@@ -127,18 +127,27 @@ class TestLegacySurveyBackendMocked:
         assert f"ra={POSITION.ra.deg}" in captured["url"]
         assert "size=100" in captured["url"]  # 26.2 / 0.262
 
-    def test_fetch_returns_an_rgb_composite(self, monkeypatch):
+    def test_fetch_combines_bands_into_a_higher_snr_single_image(self, monkeypatch):
+        # The whole point of fetching all three bands instead of one: independent
+        # noise realizations of the same real source should combine to less noise
+        # than the noisiest band carries alone (inverse-variance weighting).
+        rng = np.random.default_rng(0)
+        g = rng.normal(0, 1.0, size=(20, 20))
+        r = rng.normal(0, 2.0, size=(20, 20))
+        z = rng.normal(0, 3.0, size=(20, 20))
+        cube = np.stack([g, r, z])
+
         def fake_get(url, timeout):
             buf = io.BytesIO()
-            fits.writeto(buf, _fake_grz_cube(), overwrite=True)
+            fits.writeto(buf, cube, overwrite=True)
             return _FakeResponse(200, buf.getvalue())
 
         monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
         backend = LegacySurveyBackend()
         result = backend.fetch(POSITION, size_arcsec=26.2)
-        assert result.data.ndim == 3
-        assert result.data.shape[-1] == 3
-        assert result.data.shape[:2] == (10, 10)
+        assert result.data.ndim == 2
+        assert result.data.shape == (20, 20)
+        assert result.data.std() < z.std()
 
     def test_client_error_status_fails_immediately_without_retrying(self, monkeypatch):
         # A 4xx is never fixed by retrying -- assert it does NOT sleep/retry, by not
@@ -240,7 +249,7 @@ class TestOpticalBackendsLive:
         # checked during development to actually have Legacy Survey imaging.
         backend = LegacySurveyBackend()
         result = backend.fetch(POSITION, size_arcsec=26.2)
-        assert result.data.shape == (100, 100, 3)
+        assert result.data.shape == (100, 100)
         assert result.provenance.startswith("legacy_survey:")
 
     def test_skyview_is_available_reports_ok(self):

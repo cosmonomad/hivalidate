@@ -16,7 +16,6 @@ import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.visualization import make_lupton_rgb
 from astropy.wcs import WCS
 from astroquery.skyview import SkyView
 
@@ -98,20 +97,41 @@ class SkyViewBackend(CutoutBackend):
             return False, str(exc)
 
 
+def _combine_bands_for_snr(bands: list[np.ndarray]) -> np.ndarray:
+    """Inverse-variance-weighted combination of independent single-band images into
+    one 'white light' image with higher signal-to-noise than any single band alone
+    -- co-adding independent noise realizations of the same real structure is the
+    standard way multi-band imaging helps faint-source visibility (PLAN.md-style
+    reasoning: this is what motivated fetching grz instead of one band in the first
+    place). Per-band noise is estimated via a robust MAD-based sigma (unlike a plain
+    std, this isn't inflated by the handful of bright-star/galaxy pixels also in the
+    cutout), and each band is weighted by 1/sigma**2 so a noisier band contributes
+    less rather than diluting the combination.
+    """
+    weighted_sum = np.zeros_like(bands[0], dtype=float)
+    weight_total = 0.0
+    for band in bands:
+        sigma = 1.4826 * np.median(np.abs(band - np.median(band)))
+        if sigma == 0:
+            continue
+        weight = 1.0 / sigma**2
+        weighted_sum += band * weight
+        weight_total += weight
+    if weight_total == 0:
+        # Every band was perfectly uniform (only possible with synthetic/test data,
+        # never a real cutout) -- nothing to weight, fall back to an unweighted sum.
+        return sum(bands)
+    return weighted_sum / weight_total
+
+
 class LegacySurveyBackend(CutoutBackend):
     """DESI Legacy Imaging Surveys cutout service (`legacysurvey.org/viewer`),
     migrated from `legacy/download_legacy.py`. Requests the grz multi-band FITS cube
-    and builds the same kind of RGB composite the legacy script produced (via
-    `astropy.visualization.make_lupton_rgb`), rather than a single band rendered as
-    greyscale -- both because grz *is* what the Legacy Survey viewer itself shows as
-    a colour composite, and because the Lupton stretch is asinh-based: it compresses
-    bright pixels into the display range instead of letting them dominate it, which
-    a single band under a linear stretch (`plotting._robust_vlim`'s mean +/- n*std)
-    can't avoid -- a bright star/galaxy in frame was making real but fainter
-    structure in the rest of the cutout invisible.
-
-    Band-to-channel mapping matches both the legacy script and the official viewer's
-    own convention: reddest band (z) -> Red channel, g -> Blue.
+    and combines the three bands into one higher-signal-to-noise greyscale image
+    (`_combine_bands_for_snr`) rather than rendering a single band -- three
+    independent noise realizations of the same real source combine to reveal fainter
+    structure than any one band shows alone, which is exactly what matters for
+    validating a real-but-faint HI detection against its optical counterpart.
 
     Coverage is a known simplification: the real Legacy Survey footprint (DECaLS +
     MzLS/BASS + DES, per layer) is not a simple declination cut, and no attempt is
@@ -128,7 +148,8 @@ class LegacySurveyBackend(CutoutBackend):
     APPROX_DEC_CEILING_DEG = 34.0
 
     #: Requested in this order; the cutout API returns the cube's leading axis in
-    #: the same order. g -> Blue, r -> Green, z -> Red (see class docstring).
+    #: the same order, combined by `_combine_bands_for_snr` (band identity doesn't
+    #: matter beyond that -- unlike an RGB composite, no channel mapping is needed).
     BANDS = "grz"
 
     def __init__(
@@ -136,14 +157,10 @@ class LegacySurveyBackend(CutoutBackend):
         layer: str = "ls-dr10",
         pixscale_arcsec: float = 0.262,
         max_retries: int = 5,
-        stretch: float = 0.5,
-        q: float = 10,
     ):
         self.layer = layer
         self.pixscale_arcsec = pixscale_arcsec
         self.max_retries = max_retries
-        self.stretch = stretch
-        self.q = q
 
     def check_coverage(self, position: SkyCoord) -> bool:
         return position.dec.deg < self.APPROX_DEC_CEILING_DEG
@@ -199,11 +216,11 @@ class LegacySurveyBackend(CutoutBackend):
             # `check_coverage`'s declination heuristic can't fully replace.
             raise CutoutUnavailable(f"No {self.layer} coverage at this position (empty cutout)")
 
-        g, r, z = (np.nan_to_num(cube[i]) for i in range(3))
-        rgb = make_lupton_rgb(z, r, g, stretch=self.stretch, Q=self.q)
+        bands = [np.nan_to_num(cube[i]) for i in range(cube.shape[0])]
+        combined = _combine_bands_for_snr(bands)
 
         return CutoutResult(
-            data=rgb, wcs=WCS(header).celestial, provenance=f"legacy_survey:{self.layer}"
+            data=combined, wcs=WCS(header).celestial, provenance=f"legacy_survey:{self.layer}"
         )
 
     def is_available(self) -> tuple[bool, str]:

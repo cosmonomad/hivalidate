@@ -13,10 +13,12 @@ examples in `data/output_validation_true/`):
 Two deliberate improvements over the legacy script, both because it hardcoded
 values that only happened to suit one specific field/SB:
 
-- Continuum panel display range is computed from the cutout's own robust statistics
-  (mean +/- 3 sigma, matching what the optical panel already did), not the legacy
-  script's hardcoded `vmin=-0.0001, vmax=0.00025` (right for one continuum image,
-  wrong for any other survey/field).
+- Both the optical and continuum panels' display range/contrast are computed from
+  the cutout's own background statistics (`_background_anchored_norm`), not the
+  legacy script's hardcoded `vmin=-0.0001, vmax=0.00025` for continuum (right for
+  one continuum image, wrong for any other survey/field) -- and not a plain linear
+  mean +/- n*std either, which a single bright source's dynamic range can flatten
+  the rest of either panel under (see that function's docstring).
 - Provenance (which optical/continuum backend actually supplied each cutout) is
   annotated directly on the figure, since there are now multiple possible sources
   per panel (PLAN.md section 5, "Provenance").
@@ -155,58 +157,62 @@ def _set_fov(ax, wcs: WCS, center: SkyCoord, size_arcsec: float) -> None:
     ax.set_ylim(float(y0 - half_height_pix.value), float(y0 + half_height_pix.value))
 
 
-def _robust_vlim(data: np.ndarray, n_sigma: float = 3.0) -> tuple[float, float]:
-    """mean +/- n_sigma*std, falling back to (0, 1) for degenerate (all-equal or
-    all-NaN) data -- avoids a matplotlib warning/blank image on a placeholder cutout.
-    """
-    finite = data[np.isfinite(data)]
-    if finite.size == 0 or finite.std() == 0:
-        return 0.0, 1.0
-    return finite.mean() - n_sigma * finite.std(), finite.mean() + n_sigma * finite.std()
-
-
 #: vmax = background median + this many sigma-clipped background sigmas; vmin = median
 #: - 1 sigma. Picked by comparing a grid of values (10-80) against a real bright
 #: spiral galaxy cutout (dev session 2026-09-08): below ~30, the galaxy's own core
 #: saturates to a solid black blob and its spiral structure disappears; 50 keeps that
 #: structure visible as grey gradients while a fainter starfield elsewhere still shows
-#: plenty of faint detail.
-_OPTICAL_VMAX_SIGMA = 50.0
+#: plenty of faint detail. Reused as-is for the continuum panel (see
+#: `_background_anchored_norm`'s docstring) -- nothing about the choice is
+#: optical-specific, and it worked equally well there against a real bright-source case.
+_VMAX_SIGMA = 50.0
 
 
-def _optical_norm(data: np.ndarray) -> ImageNormalize:
-    """A background-anchored asinh normalization for the optical panel, instead of
-    `_robust_vlim`'s linear mean +/- n*std. Real optical images have most of their
-    dynamic range in a handful of bright-star pixels -- under a linear stretch those
-    inflate the std enough that faint galaxies/background structure (the whole point
-    of `LegacySurveyBackend`'s multi-band S/N combination, see cutouts/optical.py)
-    get compressed into a nearly uniform grey and become hard to see. asinh is
-    linear near zero (so faint signal still shows contrast) and logarithmic at the
-    high end (so it doesn't need a bright star's peak to set the whole scale).
+def _background_anchored_norm(data: np.ndarray) -> ImageNormalize:
+    """A background-anchored asinh normalization, shared by the optical and
+    continuum panels, instead of a linear mean +/- n*std. Real sky images (optical
+    or continuum) have most of their dynamic range in a handful of bright-source
+    pixels -- under a linear stretch those inflate the std enough that faint
+    structure elsewhere gets compressed into a nearly uniform colour and becomes
+    hard to see. asinh is linear near zero (so faint signal still shows contrast)
+    and logarithmic at the high end (so it doesn't need a bright source's peak to
+    set the whole scale).
+
+    This started as an optical-only fix (`LegacySurveyBackend`'s grz S/N
+    combination was being wasted under a washed-out linear stretch), but the same
+    failure mode turned out to affect continuum too, often worse: scanning all 448
+    real sources in `data/run_sofia/`, one continuum cutout's naive std came out
+    ~196x its sigma-clipped background std (a real bright compact source), and
+    under the old linear stretch that single source's dynamic range flattened the
+    *entire rest of the panel* to a uniform colour -- real sidelobe/ring structure
+    around it was completely invisible, not just faint. The asinh version reveals
+    it clearly (dev session 2026-09-08).
 
     vmin/vmax come from `sigma_clipped_stats`'s background median/std, not a
     data-driven interval like `PercentileInterval` or `ZScaleInterval` -- both were
-    tried first and both back-fired:
+    tried first (for the optical panel) and both back-fired:
 
-    - `PercentileInterval(99.5)` (the original version) is a plain percentile: a big
-      enough saturated/bloomed star can cover more than 0.5% of a cutout's pixels and
-      drag vmax up on its own (confirmed with a synthetic saturated patch: vmax
-      jumped >3x and visibly washed out the whole image).
+    - `PercentileInterval(99.5)` is a plain percentile: a big enough saturated/
+      bloomed source can cover more than 0.5% of a cutout's pixels and drag vmax up
+      on its own (confirmed with a synthetic saturated patch: vmax jumped >3x and
+      visibly washed out the whole image).
     - `ZScaleInterval` (the IRAF/DS9 algorithm) fixed that, but its vmin/vmax aren't
       anchored to the real background level -- on a real cutout its vmin sat well
-      below the background median, which pushed the *background itself* substantially
-      up the display range, making everything darker overall and, on a bright galaxy,
-      leaving much less headroom before its core saturated to a solid black blob
-      (losing spiral structure -- direct user feedback after the zscale version).
+      below the background median, which pushed the *background itself*
+      substantially up the display range, making everything darker overall and, on
+      a bright galaxy, leaving much less headroom before its core saturated to a
+      solid black blob (losing spiral structure -- direct user feedback after the
+      zscale version).
 
     Since vmin/vmax here are derived purely from robust background statistics and
-    never look at the actual data extremes, a saturated star of any brightness cannot
-    move them at all -- strictly more robust than zscale, not just as robust.
+    never look at the actual data extremes, a saturated/bright source of any
+    brightness cannot move them at all -- strictly more robust than zscale, not
+    just as robust.
     """
     _, median, bg_std = sigma_clipped_stats(data, sigma=3.0, maxiters=5)
     if np.isfinite(bg_std) and bg_std > 0:
         vmin = median - 1.0 * bg_std
-        vmax = median + _OPTICAL_VMAX_SIGMA * bg_std
+        vmax = median + _VMAX_SIGMA * bg_std
         a = np.clip(bg_std / (vmax - vmin), 0.005, 0.5)
     else:
         vmin, vmax, a = 0.0, 1.0, 0.1  # degenerate (e.g. uniform test) data
@@ -261,7 +267,7 @@ def build_validation_figure(
             origin="lower",
             interpolation="nearest",
             cmap="Greys",
-            norm=_optical_norm(optical.data),
+            norm=_background_anchored_norm(optical.data),
         )
         ax_opt.contour(
             col_density_map, levels=contour_levels_scaled, transform=ax_opt.get_transform(mom0_wcs)
@@ -288,14 +294,12 @@ def build_validation_figure(
     cont_wcs = continuum.wcs if continuum is not None else mom0_wcs
     ax_cont = fig.add_subplot(232, projection=cont_wcs)
     if continuum is not None:
-        vmin, vmax = _robust_vlim(continuum.data)
         ax_cont.imshow(
             continuum.data,
             origin="lower",
             interpolation="nearest",
             cmap="afmhot",
-            vmin=vmin,
-            vmax=vmax,
+            norm=_background_anchored_norm(continuum.data),
         )
         ax_cont.contour(
             col_density_map, levels=contour_levels_scaled, transform=ax_cont.get_transform(mom0_wcs)

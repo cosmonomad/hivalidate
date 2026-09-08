@@ -167,8 +167,22 @@ def _set_fov(ax, wcs: WCS, center: SkyCoord, size_arcsec: float) -> None:
 #: optical-specific, and it worked equally well there against a real bright-source case.
 _VMAX_SIGMA = 50.0
 
+#: Continuum-panel override for `_background_anchored_norm`'s vmin/vmax sigma
+#: multiples. `afmhot` runs black (low) -> white (high), so the optical panel's
+#: defaults (vmin only 1 sigma below background) put the continuum background
+#: itself quite dark -- direct user feedback (dev session 2026-09-08) after seeing
+#: it against real cutouts. A higher vmin multiple lifts the background further up
+#: the colour scale (brighter); a lower vmax multiple keeps that consistent with
+#: `a`'s meaning without needing a separate asinh parameter. Picked by comparing a
+#: grid of (vmin, vmax) sigma multiples against real cutouts: brighter than this
+#: started washing out real sidelobe/ring structure around bright sources.
+_CONTINUUM_VMIN_SIGMA = 3.0
+_CONTINUUM_VMAX_SIGMA = 25.0
 
-def _background_anchored_norm(data: np.ndarray) -> ImageNormalize:
+
+def _background_anchored_norm(
+    data: np.ndarray, vmin_sigma: float = 1.0, vmax_sigma: float = _VMAX_SIGMA
+) -> ImageNormalize:
     """A background-anchored asinh normalization, shared by the optical and
     continuum panels, instead of a linear mean +/- n*std. Real sky images (optical
     or continuum) have most of their dynamic range in a handful of bright-source
@@ -208,11 +222,17 @@ def _background_anchored_norm(data: np.ndarray) -> ImageNormalize:
     never look at the actual data extremes, a saturated/bright source of any
     brightness cannot move them at all -- strictly more robust than zscale, not
     just as robust.
+
+    `vmin_sigma`/`vmax_sigma` (how many sigma-clipped background sigmas below/above
+    the median vmin/vmax sit) default to values tuned for the optical panel's
+    `Greys` colormap (see `_VMAX_SIGMA`'s comment); the continuum panel passes
+    `_CONTINUUM_VMIN_SIGMA`/`_CONTINUUM_VMAX_SIGMA` instead, tuned separately for
+    `afmhot` (see that constant's comment).
     """
     _, median, bg_std = sigma_clipped_stats(data, sigma=3.0, maxiters=5)
     if np.isfinite(bg_std) and bg_std > 0:
-        vmin = median - 1.0 * bg_std
-        vmax = median + _VMAX_SIGMA * bg_std
+        vmin = median - vmin_sigma * bg_std
+        vmax = median + vmax_sigma * bg_std
         a = np.clip(bg_std / (vmax - vmin), 0.005, 0.5)
     else:
         vmin, vmax, a = 0.0, 1.0, 0.1  # degenerate (e.g. uniform test) data
@@ -299,7 +319,11 @@ def build_validation_figure(
             origin="lower",
             interpolation="nearest",
             cmap="afmhot",
-            norm=_background_anchored_norm(continuum.data),
+            norm=_background_anchored_norm(
+                continuum.data,
+                vmin_sigma=_CONTINUUM_VMIN_SIGMA,
+                vmax_sigma=_CONTINUUM_VMAX_SIGMA,
+            ),
         )
         ax_cont.contour(
             col_density_map, levels=contour_levels_scaled, transform=ax_cont.get_transform(mom0_wcs)

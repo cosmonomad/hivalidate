@@ -428,7 +428,9 @@ def build_validation_figure(
     return fig
 
 
-def _beam_location(center: SkyCoord, fov_arcsec: float, beam_maj_arcsec: float) -> tuple[float, float]:
+def _beam_location(
+    center: SkyCoord, fov_arcsec: float, beam_maj_arcsec: float
+) -> tuple[float, float]:
     """Sky position for the beam ellipse -- inset from the displayed field of view's
     bottom-left corner (matching the legacy script's placement) by enough real
     angular distance that the ellipse (up to `beam_maj_arcsec` across) stays fully

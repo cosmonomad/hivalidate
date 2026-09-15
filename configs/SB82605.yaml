@@ -28,7 +28,7 @@ cosmology:
   tcmb0: 2.725
 
 cutouts:
-  optical_priority: [skyview, legacy_survey]
+  optical_priority: [legacy_survey, skyview]
   continuum_priority: [local, racs_casda]
   cache_dir: ../data/cutout_cache
   casda_username_env: CASDA_USERNAME

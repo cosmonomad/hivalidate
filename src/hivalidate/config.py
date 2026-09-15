@@ -56,7 +56,7 @@ class CutoutSettings:
     this module has no dependency on astroquery/MontagePy.
     """
 
-    optical_priority: list[str] = field(default_factory=lambda: ["skyview", "legacy_survey"])
+    optical_priority: list[str] = field(default_factory=lambda: ["legacy_survey", "skyview"])
     continuum_priority: list[str] = field(default_factory=lambda: ["local", "racs_casda"])
     cache_dir: Path | None = None
     casda_username_env: str = "CASDA_USERNAME"

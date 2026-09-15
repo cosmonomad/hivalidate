@@ -68,43 +68,47 @@ def crossmatch_redshifts(
     against an independent optical/spectroscopic redshift instead of another HI
     detection.
 
-    Every external-catalogue row within `sep_arcsec` of an HI row is considered a
-    candidate, not just the single nearest one: an earlier version used
-    `SkyCoord.match_to_catalog_sky` (nearest position only) and rejected that
-    source entirely if the *nearest* candidate failed the velocity tolerance, even
-    when a farther-but-still-within-`sep_arcsec` candidate was a good velocity
-    match -- confirmed against real data (dev session 2026-09-15): a positionally
-    closer but physically unrelated interloper (11,531 km/s away) masked a real
-    counterpart sitting 15" away (13-16 km/s away) for one source. Among the
-    candidates that pass *both* tolerances, the closest in position wins, since
-    position is the more reliable end of a broad-lined HI detection's centroid.
+    Keeps *every* external-catalogue row within `sep_arcsec` that also passes the
+    velocity tolerance, not just one -- an HI detection can legitimately have more
+    than one real optical counterpart (an interacting pair, a gas-rich group, a
+    tidal feature) since the HI disk is often more spatially extended than any
+    single galaxy it overlaps, per direct user feedback. This also matches the
+    legacy script's own `search_gama`, which returned and plotted every GAMA match,
+    not just the closest -- an earlier version of this function collapsed to a
+    single nearest-position match per source, which was a real regression against
+    that behaviour (and separately had its own bug: rejecting a source outright
+    when its nearest-position candidate failed velocity tolerance even though a
+    farther, still-in-range candidate would have passed -- confirmed against real
+    data, dev session 2026-09-15, before this rewrite; now moot, since all
+    in-tolerance candidates are kept).
 
-    Adds six columns to a copy of `hi_table`, NaN (or, for `external_catalogue_name`,
-    empty) where a row has no match within tolerance:
+    Adds six columns to a copy of `hi_table`:
 
-    - ``external_z``: the matched row's redshift
-    - ``external_ra``/``external_dec``: the matched row's sky position -- kept (not
-      just the redshift) so `plotting.build_validation_figure` can overlay the
-      actual matched source on the optical panel, the way the legacy script did for
-      GAMA cross-matches
-    - ``external_sep_arcsec``: angular separation to the matched row
-    - ``external_vel_diff_km_s``: |HI velocity - matched optical velocity|
-    - ``external_catalogue_name``: `catalogue_name` verbatim, for every row -- lets
-      the figure label a match "DESI z=..." / "GAMA z=..." instead of a generic
-      "External z=...", per direct user feedback that the generic label wasn't
-      informative enough once more than one kind of catalogue could be in play.
+    - ``external_z``: matched redshift(s) -- a variable-length float array per row
+      (empty if unmatched, length >1 if multiple counterparts), sorted closest-in-
+      position first
+    - ``external_ra``/``external_dec``: matched sky position(s), same shape as
+      `external_z` -- kept (not just the redshift) so
+      `plotting.build_validation_figure` can overlay the actual matched source(s)
+      on the optical panel, the way the legacy script did for GAMA cross-matches
+    - ``external_sep_arcsec``/``external_vel_diff_km_s``: angular separation /
+      |HI velocity - optical velocity| for each match, same shape as `external_z`
+    - ``external_catalogue_name``: `catalogue_name` verbatim (a single string, not
+      an array -- one external catalogue per `crossmatch_redshifts` call), empty
+      for a row with no match
 
     Returns
     -------
-    CrossmatchResult with the annotated table and the number of HI rows matched.
+    CrossmatchResult with the annotated table and the number of HI rows with at
+    least one match (not the total number of match *pairs*, which can be higher).
     """
     hi_table = hi_table.copy()
     n = len(hi_table)
-    external_z = np.full(n, np.nan)
-    external_ra = np.full(n, np.nan)
-    external_dec = np.full(n, np.nan)
-    external_sep_arcsec = np.full(n, np.nan)
-    external_vel_diff_km_s = np.full(n, np.nan)
+    external_z: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
+    external_ra: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
+    external_dec: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
+    external_sep_arcsec: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
+    external_vel_diff_km_s: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
     external_catalogue_name = np.full(n, "", dtype=object)
 
     if n > 0 and len(external_table) > 0:
@@ -136,22 +140,24 @@ def crossmatch_redshifts(
         vel_diff_km_s = vel_diff_km_s[within_vel]
 
         if len(idx_hi_pairs) > 0:
-            # Among each HI row's surviving candidates (passing both tolerances),
-            # keep only the closest in position: sort by (hi row, separation), then
-            # take the first row of each group.
+            # Group every surviving candidate by HI row, closest-in-position first
+            # within each group.
             order = np.lexsort((sep_arcsec_pairs, idx_hi_pairs))
             idx_hi_sorted = idx_hi_pairs[order]
-            first_of_group = np.concatenate(([True], idx_hi_sorted[1:] != idx_hi_sorted[:-1]))
-            best = order[first_of_group]
-
-            matched_hi_idx = idx_hi_pairs[best]
-            matched_ext_idx = idx_ext_pairs[best]
-            external_z[matched_hi_idx] = ext_z[matched_ext_idx]
-            external_ra[matched_hi_idx] = ext_ra[matched_ext_idx]
-            external_dec[matched_hi_idx] = ext_dec[matched_ext_idx]
-            external_sep_arcsec[matched_hi_idx] = sep_arcsec_pairs[best]
-            external_vel_diff_km_s[matched_hi_idx] = vel_diff_km_s[best]
-            external_catalogue_name[matched_hi_idx] = catalogue_name
+            boundaries = np.flatnonzero(np.diff(idx_hi_sorted)) + 1
+            for hi_group, ext_group, sep_group, vel_group in zip(
+                np.split(idx_hi_sorted, boundaries),
+                np.split(idx_ext_pairs[order], boundaries),
+                np.split(sep_arcsec_pairs[order], boundaries),
+                np.split(vel_diff_km_s[order], boundaries),
+            ):
+                hi_idx = int(hi_group[0])
+                external_z[hi_idx] = ext_z[ext_group]
+                external_ra[hi_idx] = ext_ra[ext_group]
+                external_dec[hi_idx] = ext_dec[ext_group]
+                external_sep_arcsec[hi_idx] = sep_group
+                external_vel_diff_km_s[hi_idx] = vel_group
+                external_catalogue_name[hi_idx] = catalogue_name
 
     hi_table["external_z"] = external_z
     hi_table["external_ra"] = external_ra
@@ -159,4 +165,5 @@ def crossmatch_redshifts(
     hi_table["external_sep_arcsec"] = external_sep_arcsec
     hi_table["external_vel_diff_km_s"] = external_vel_diff_km_s
     hi_table["external_catalogue_name"] = external_catalogue_name
-    return CrossmatchResult(table=hi_table, n_matched=int(np.sum(~np.isnan(external_z))))
+    n_matched = sum(1 for z in external_z if len(z) > 0)
+    return CrossmatchResult(table=hi_table, n_matched=n_matched)

@@ -23,12 +23,15 @@ values that only happened to suit one specific field/SB:
   annotated directly on the figure, since there are now multiple possible sources
   per panel (PLAN.md section 5, "Provenance").
 
-If `row` has a `hivalidate.crossmatch` match (`external_z` etc. -- see
-`_external_match`), it's overlaid the same way the legacy script did for its GAMA
-cross-match: an 'x' marker at the matched position on the optical panel, and a
-dashed vertical line at its equivalent velocity on the spectrum panel, both labelled
-with the matched redshift. Silently omitted if `row` wasn't cross-matched (no
-external catalogue configured, or no match within tolerance) -- not an error.
+If `row` has any `hivalidate.crossmatch` matches (`external_z` etc. -- see
+`_external_matches`), each is overlaid the same way the legacy script did for its
+GAMA cross-matches: a marker at the matched position on the optical panel (cycling
+through `_EXTERNAL_MATCH_MARKERS` if there's more than one -- an HI detection can
+have more than one real optical counterpart, since HI is often more spatially
+extended than any single galaxy it overlaps), and a dashed vertical line at its
+equivalent velocity on the spectrum panel, each labelled with its own matched
+redshift. Silently omitted if `row` wasn't cross-matched (no external catalogue
+configured, or no match within tolerance) -- not an error.
 
 Every sky panel (optical, continuum, mom0, mom1) is pinned to the same real
 angular field of view, computed from the mom0 image's own WCS
@@ -186,13 +189,25 @@ _VMAX_SIGMA = 50.0
 _CONTINUUM_VMIN_SIGMA = 3.0
 _CONTINUUM_VMAX_SIGMA = 25.0
 
-#: Color for the external-redshift-match marker/line (see _external_match). Not
+#: Color for every external-redshift-match marker/line (see _external_matches). Not
 #: "C0"/"C1"/etc: the mom0 contour panel already cycles through C0-C5 for its six
 #: levels (`contour_levels` in build_validation_figure), and the beam ellipse is
 #: "C3" -- picked by direct user feedback after "C0" turned out to be the same blue
 #: as one of the contour levels. Magenta isn't in that cycle and reads clearly
 #: against both the optical panel's greyscale and the continuum panel's afmhot.
+#: One HI detection can have more than one real match (see _external_matches); all
+#: of them share this same color -- each is individually distinguishable by its own
+#: sky position (optical panel) or velocity (spectrum panel) and its own legend
+#: label, so per-match color variation isn't needed and would risk clashing with
+#: the contour cycle again for a 6th+ simultaneous match.
 _EXTERNAL_MATCH_COLOR = "magenta"
+
+#: Marker shapes cycled through for multiple simultaneous matches on the optical
+#: panel (matches the legacy script's own per-match marker cycling for GAMA
+#: cross-matches, `mk = ['x', '+', (5, 2), '1', '2', '3', '4']` in
+#: legacy/validate_detections.py) -- distinguishes overlapping markers even when
+#: two matches happen to sit close together.
+_EXTERNAL_MATCH_MARKERS = ["x", "+", "*", "D", "^", "v", "s"]
 
 
 def _background_anchored_norm(
@@ -290,7 +305,7 @@ def build_validation_figure(
     display_wcs = optical.wcs if optical is not None else mom0_wcs
     center = SkyCoord(ra=row["ra"], dec=row["dec"], unit="deg")
     fov_arcsec = reference_field_of_view_arcsec(cubelets)
-    external_match = _external_match(row)
+    external_matches = _external_matches(row)
 
     fig = Figure(figsize=(18, 11))
     fig.subplots_adjust(left=0.05, right=0.98, wspace=0.1)
@@ -319,18 +334,18 @@ def build_validation_figure(
             transform=ax_opt.get_transform("fk5"),
         )
         ax_opt.add_patch(ellipse)
-        if external_match is not None:
-            match_ra, match_dec, _, match_z, match_catalogue = external_match
+        for i, (match_ra, match_dec, _, match_z, match_catalogue) in enumerate(external_matches):
             ax_opt.scatter(
                 match_ra,
                 match_dec,
                 transform=ax_opt.get_transform("fk5"),
                 s=60,
-                marker="x",
+                marker=_EXTERNAL_MATCH_MARKERS[i % len(_EXTERNAL_MATCH_MARKERS)],
                 lw=2.0,
                 color=_EXTERNAL_MATCH_COLOR,
                 label=f"{match_catalogue} z={match_z:.4f}",
             )
+        if external_matches:
             ax_opt.legend(loc="upper left", frameon=True)
         ax_opt.set_title(f"Optical ({_provenance_backend(optical.provenance)})", size=12)
     else:
@@ -370,8 +385,7 @@ def build_validation_figure(
     ax_spec.plot(vel, cubelets.spec_flux_jy, color="k")
     ax_spec.axvline(v_sys, color="grey", ls="dotted")
     ax_spec.axhline(0, color="grey", ls="dotted")
-    if external_match is not None:
-        _, _, match_vel_km_s, match_z, match_catalogue = external_match
+    for _, _, match_vel_km_s, match_z, match_catalogue in external_matches:
         ax_spec.axvline(
             match_vel_km_s,
             color=_EXTERNAL_MATCH_COLOR,
@@ -379,6 +393,7 @@ def build_validation_figure(
             lw=1.5,
             label=f"{match_catalogue} z={match_z:.4f}",
         )
+    if external_matches:
         ax_spec.legend(loc="upper left", frameon=False)
     ax_spec.set_xlabel("Velocity (km/s)", fontsize=14)
     ax_spec.set_ylabel("Flux density (Jy)", fontsize=14)
@@ -497,45 +512,36 @@ def _beam_location(
     return float(location.ra.deg), float(location.dec.deg)
 
 
-def _is_missing(value) -> bool:
-    """True for either kind of "no value" a table cell can hold here: a plain NaN
-    float (what `crossmatch.crossmatch_redshifts` writes in-memory for an unmatched
-    row) or a masked constant (what the *same* NaN comes back as after a round trip
-    through `catalogue.write_votable`/`read_votable` -- VOTable round-trips NaN as
-    masked, and `np.isnan` on a masked constant silently evaluates falsy rather than
-    raising, so checking only `np.isnan` would treat an unmatched row as matched).
+def _external_matches(row: Row) -> list[tuple[float, float, float, float, str]]:
+    """[(ra, dec, velocity_km_s, z, catalogue_name), ...] for every
+    `hivalidate.crossmatch` external-redshift match on this source, closest in
+    position first -- an HI detection can have more than one real optical
+    counterpart (see `crossmatch.crossmatch_redshifts`'s docstring), so this is a
+    list, not a single optional match. Empty if `row` wasn't cross-matched at all:
+    either no match fell within tolerance (`row["external_z"]` is an empty array --
+    `crossmatch_redshifts` always writes one, matched or not), or crossmatching
+    wasn't run for this catalogue in the first place (a plain SoFiA catalogue row
+    has no `external_z` column at all -- the same "no matches" outcome). `catalogue_name`
+    (e.g. "DESI", "GAMA" -- see `Config.paths.external_redshift_catalogue_name`)
+    falls back to a generic "External" if that column is missing, for a match
+    produced before it existed.
     """
-    if np.ma.is_masked(value):
-        return True
-    return bool(np.isnan(value))
-
-
-def _external_match(row: Row) -> tuple[float, float, float, float, str] | None:
-    """(ra, dec, velocity_km_s, z, catalogue_name) of this source's
-    `hivalidate.crossmatch` external redshift match, or None if it wasn't
-    cross-matched (no external redshift catalogue configured, or no match within
-    tolerance -- both leave `row["external_z"]` missing, see `_is_missing`). `row`
-    is a plain SoFiA catalogue row when crossmatching wasn't run at all, so the
-    columns may not exist; that's the same "not matched" outcome as an explicit
-    no-match. `catalogue_name` (e.g. "DESI", "GAMA" -- see
-    `Config.paths.external_redshift_catalogue_name`) falls back to a generic
-    "External" if the column is missing, for a match produced before that column
-    existed.
-    """
-    if "external_z" not in row.colnames or _is_missing(row["external_z"]):
-        return None
-    ext_z = float(row["external_z"])
+    if "external_z" not in row.colnames or len(row["external_z"]) == 0:
+        return []
     if "external_catalogue_name" in row.colnames:
         catalogue_name = str(row["external_catalogue_name"])
     else:
         catalogue_name = "External"
-    return (
-        float(row["external_ra"]),
-        float(row["external_dec"]),
-        conversions.redshift_to_velocity(ext_z),
-        ext_z,
-        catalogue_name,
-    )
+    return [
+        (
+            float(ra),
+            float(dec),
+            conversions.redshift_to_velocity(float(z)),
+            float(z),
+            catalogue_name,
+        )
+        for ra, dec, z in zip(row["external_ra"], row["external_dec"], row["external_z"])
+    ]
 
 
 def _format_sky_axes(ax, *, ylabel: bool) -> None:

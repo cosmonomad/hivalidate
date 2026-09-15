@@ -317,22 +317,31 @@ class TestExternalRedshiftMatchOverlay:
     behaviour was dropped during the port.
     """
 
-    def _row_with_match(
-        self, sep_arcsec: float = 5.0, z: float = 0.05, catalogue_name: str | None = "DESI"
+    def _row_with_matches(
+        self,
+        matches: list[tuple[float, float]] | None = None,
+        catalogue_name: str | None = "DESI",
     ) -> Table:
+        """`matches`: list of (sep_arcsec, z) pairs -- defaults to a single match
+        5" away at z=0.05.
+        """
+        if matches is None:
+            matches = [(5.0, 0.05)]
         row = _real_row()
         center = SkyCoord(ra=float(row["ra"]), dec=float(row["dec"]), unit="deg")
-        match_pos = center.spherical_offsets_by(sep_arcsec * u.arcsec, 0 * u.arcsec)
+        positions = [
+            center.spherical_offsets_by(sep * u.arcsec, 0 * u.arcsec) for sep, _ in matches
+        ]
         data = {name: [row[name]] for name in row.colnames}
-        data["external_z"] = [z]
-        data["external_ra"] = [match_pos.ra.deg]
-        data["external_dec"] = [match_pos.dec.deg]
+        data["external_z"] = [np.array([z for _, z in matches], dtype=float)]
+        data["external_ra"] = [np.array([p.ra.deg for p in positions], dtype=float)]
+        data["external_dec"] = [np.array([p.dec.deg for p in positions], dtype=float)]
         if catalogue_name is not None:
             data["external_catalogue_name"] = [catalogue_name]
         return Table(data)[0]
 
     def test_overlays_marker_and_spectrum_line_labelled_with_the_catalogue_name(self):
-        row = self._row_with_match(z=0.05, catalogue_name="DESI")
+        row = self._row_with_matches(matches=[(5.0, 0.05)], catalogue_name="DESI")
         cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
         fig = build_validation_figure(
             row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
@@ -355,10 +364,38 @@ class TestExternalRedshiftMatchOverlay:
         ]
         assert vline_x == pytest.approx([expected_vel])
 
+    def test_overlays_a_marker_and_line_per_match_for_multiple_counterparts(self):
+        # An HI detection can have more than one real optical counterpart (an
+        # interacting pair, a gas-rich group) since HI is often more spatially
+        # extended than any single galaxy it overlaps -- direct user feedback.
+        row = self._row_with_matches(matches=[(5.0, 0.05), (12.0, 0.052)], catalogue_name="DESI")
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        ax_opt = fig.axes[0]
+        assert len(ax_opt.collections) >= 2  # one scatter marker per match
+        opt_legend = ax_opt.get_legend()
+        assert opt_legend is not None
+        opt_labels = {t.get_text() for t in opt_legend.get_texts()}
+        assert "DESI z=0.0500" in opt_labels
+        assert "DESI z=0.0520" in opt_labels
+
+        ax_spec = fig.axes[2]
+        vline_x = sorted(
+            ln.get_xdata()[0]
+            for ln in ax_spec.lines
+            if ln.get_linestyle() == "--" and ln.get_color() == _EXTERNAL_MATCH_COLOR
+        )
+        expected = sorted(
+            [conversions.redshift_to_velocity(0.05), conversions.redshift_to_velocity(0.052)]
+        )
+        assert vline_x == pytest.approx(expected)
+
     def test_falls_back_to_a_generic_label_when_catalogue_name_column_is_missing(self):
         # A match produced before external_catalogue_name existed -- must still show
         # something, not crash.
-        row = self._row_with_match(z=0.05, catalogue_name=None)
+        row = self._row_with_matches(matches=[(5.0, 0.05)], catalogue_name=None)
         cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
         fig = build_validation_figure(
             row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
@@ -376,8 +413,8 @@ class TestExternalRedshiftMatchOverlay:
         assert fig.axes[0].get_legend() is None
         assert fig.axes[2].get_legend() is None
 
-    def test_no_overlay_when_external_z_is_nan(self):
-        row = self._row_with_match(z=float("nan"))
+    def test_no_overlay_when_external_z_is_empty(self):
+        row = self._row_with_matches(matches=[])
         cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
         fig = build_validation_figure(
             row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()

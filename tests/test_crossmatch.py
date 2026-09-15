@@ -104,17 +104,18 @@ class TestCrossmatchRedshifts:
         result = crossmatch.crossmatch_redshifts(hi_table, external, catalogue_name="DESI")
         assert result.n_matched == 1
 
-        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME]
+        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME][0]
+        assert len(matched_row["external_z"]) == 1
         assert matched_row["external_z"][0] == pytest.approx(matching_z)
         assert matched_row["external_ra"][0] == pytest.approx(offset.ra.deg)
         assert matched_row["external_dec"][0] == pytest.approx(offset.dec.deg)
         assert matched_row["external_sep_arcsec"][0] == pytest.approx(1.0, abs=1e-3)
-        assert not np.isnan(matched_row["external_vel_diff_km_s"][0])
-        assert matched_row["external_catalogue_name"][0] == "DESI"
+        assert len(matched_row["external_vel_diff_km_s"]) == 1
+        assert matched_row["external_catalogue_name"] == "DESI"
 
         other_rows = result.table[result.table["name"] != REAL_SOURCE_NAME]
-        assert np.all(np.isnan(other_rows["external_z"]))
-        assert np.all(np.isnan(other_rows["external_ra"]))
+        assert all(len(z) == 0 for z in other_rows["external_z"])
+        assert all(len(ra) == 0 for ra in other_rows["external_ra"])
         assert np.all(other_rows["external_catalogue_name"] == "")
 
     def test_position_within_tolerance_but_velocity_too_different_does_not_match(self):
@@ -144,7 +145,12 @@ class TestCrossmatchRedshifts:
         result = crossmatch.crossmatch_redshifts(hi_table, external, sep_arcsec=30.0)
         assert result.n_matched == 0
 
-    def test_picks_the_closer_of_two_candidates_within_both_tolerances(self):
+    def test_keeps_every_candidate_within_both_tolerances_closest_first(self):
+        # An HI detection can have more than one real optical counterpart (an
+        # interacting pair, a gas-rich group) since HI is often more spatially
+        # extended than any single galaxy it overlaps -- direct user feedback. Both
+        # candidates here are equally good velocity matches, so both should survive,
+        # ordered closest-in-position first.
         hi_table = _real_hi_table()
         row = _real_source_row(hi_table)
         center = SkyCoord(ra=float(row["ra"][0]), dec=float(row["dec"][0]), unit="deg")
@@ -159,8 +165,11 @@ class TestCrossmatchRedshifts:
             }
         )
         result = crossmatch.crossmatch_redshifts(hi_table, external)
-        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME]
+        assert result.n_matched == 1  # one HI *source* has matches, even though 2 pairs exist
+        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME][0]
+        assert len(matched_row["external_sep_arcsec"]) == 2
         assert matched_row["external_sep_arcsec"][0] == pytest.approx(1.0, abs=1e-3)
+        assert matched_row["external_sep_arcsec"][1] == pytest.approx(5.0, abs=1e-3)
 
     def test_a_closer_interloper_does_not_mask_a_farther_real_match(self):
         # Regression test for a real bug (dev session 2026-09-15): an earlier version
@@ -185,7 +194,10 @@ class TestCrossmatchRedshifts:
             }
         )
         result = crossmatch.crossmatch_redshifts(hi_table, external, sep_arcsec=30.0)
-        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME]
+        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME][0]
+        # The interloper fails velocity tolerance outright, so it's never a
+        # candidate at all -- only the real match should appear.
+        assert len(matched_row["external_z"]) == 1
         assert matched_row["external_z"][0] == pytest.approx(matching_z)
         assert matched_row["external_sep_arcsec"][0] == pytest.approx(15.0, abs=1e-3)
 
@@ -201,4 +213,4 @@ class TestCrossmatchRedshifts:
         external = Table({"z": [], "target_ra": [], "target_dec": []})
         result = crossmatch.crossmatch_redshifts(hi_table, external)
         assert result.n_matched == 0
-        assert np.all(np.isnan(result.table["external_z"]))
+        assert all(len(z) == 0 for z in result.table["external_z"])

@@ -189,24 +189,23 @@ _VMAX_SIGMA = 50.0
 _CONTINUUM_VMIN_SIGMA = 3.0
 _CONTINUUM_VMAX_SIGMA = 25.0
 
-#: Color for every external-redshift-match marker/line (see _external_matches). Not
+#: Colors cycled through for external-redshift-match markers/lines (see
+#: _external_matches), one per simultaneous match on a given source. Not
 #: "C0"/"C1"/etc: the mom0 contour panel already cycles through C0-C5 for its six
 #: levels (`contour_levels` in build_validation_figure), and the beam ellipse is
-#: "C3" -- picked by direct user feedback after "C0" turned out to be the same blue
-#: as one of the contour levels. Magenta isn't in that cycle and reads clearly
-#: against both the optical panel's greyscale and the continuum panel's afmhot.
-#: One HI detection can have more than one real match (see _external_matches); all
-#: of them share this same color -- each is individually distinguishable by its own
-#: sky position (optical panel) or velocity (spectrum panel) and its own legend
-#: label, so per-match color variation isn't needed and would risk clashing with
-#: the contour cycle again for a 6th+ simultaneous match.
-_EXTERNAL_MATCH_COLOR = "magenta"
+#: "C3" -- "C0" alone was picked first and turned out to be the same blue as one of
+#: the contour levels (direct user feedback); after adding support for more than
+#: one match per source, per-match color variation was requested too, so this is
+#: now a palette, not a single color -- checked by eye against all six contour
+#: colors (dev session 2026-09-15) to confirm none of them collide.
+_EXTERNAL_MATCH_COLORS = ["magenta", "cyan", "gold", "deeppink", "turquoise", "hotpink"]
 
-#: Marker shapes cycled through for multiple simultaneous matches on the optical
+#: Marker shapes cycled through alongside _EXTERNAL_MATCH_COLORS on the optical
 #: panel (matches the legacy script's own per-match marker cycling for GAMA
 #: cross-matches, `mk = ['x', '+', (5, 2), '1', '2', '3', '4']` in
-#: legacy/validate_detections.py) -- distinguishes overlapping markers even when
-#: two matches happen to sit close together.
+#: legacy/validate_detections.py) -- varying both color and shape keeps matches
+#: distinguishable even past _EXTERNAL_MATCH_COLORS' own length, and when two
+#: matches happen to sit close together.
 _EXTERNAL_MATCH_MARKERS = ["x", "+", "*", "D", "^", "v", "s"]
 
 
@@ -342,7 +341,7 @@ def build_validation_figure(
                 s=60,
                 marker=_EXTERNAL_MATCH_MARKERS[i % len(_EXTERNAL_MATCH_MARKERS)],
                 lw=2.0,
-                color=_EXTERNAL_MATCH_COLOR,
+                color=_EXTERNAL_MATCH_COLORS[i % len(_EXTERNAL_MATCH_COLORS)],
                 label=f"{match_catalogue} z={match_z:.4f}",
             )
         if external_matches:
@@ -385,10 +384,10 @@ def build_validation_figure(
     ax_spec.plot(vel, cubelets.spec_flux_jy, color="k")
     ax_spec.axvline(v_sys, color="grey", ls="dotted")
     ax_spec.axhline(0, color="grey", ls="dotted")
-    for _, _, match_vel_km_s, match_z, match_catalogue in external_matches:
+    for i, (_, _, match_vel_km_s, match_z, match_catalogue) in enumerate(external_matches):
         ax_spec.axvline(
             match_vel_km_s,
-            color=_EXTERNAL_MATCH_COLOR,
+            color=_EXTERNAL_MATCH_COLORS[i % len(_EXTERNAL_MATCH_COLORS)],
             ls="dashed",
             lw=1.5,
             label=f"{match_catalogue} z={match_z:.4f}",

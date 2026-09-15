@@ -22,7 +22,7 @@ from matplotlib.patches import Ellipse
 from hivalidate import catalogue, conversions
 from hivalidate.cutouts.base import CutoutResult
 from hivalidate.plotting import (
-    _EXTERNAL_MATCH_COLOR,
+    _EXTERNAL_MATCH_COLORS,
     DISPLAY_FOV_FACTOR,
     build_validation_figure,
     load_source_cubelets,
@@ -357,12 +357,13 @@ class TestExternalRedshiftMatchOverlay:
         assert spec_legend is not None
         assert any("DESI z=0.0500" in t.get_text() for t in spec_legend.get_texts())
         expected_vel = conversions.redshift_to_velocity(0.05)
-        vline_x = [
-            ln.get_xdata()[0]
+        match_lines = [
+            ln
             for ln in ax_spec.lines
-            if ln.get_linestyle() == "--" and ln.get_color() == _EXTERNAL_MATCH_COLOR
+            if ln.get_linestyle() == "--" and ln.get_color() in _EXTERNAL_MATCH_COLORS
         ]
-        assert vline_x == pytest.approx([expected_vel])
+        assert [ln.get_xdata()[0] for ln in match_lines] == pytest.approx([expected_vel])
+        assert match_lines[0].get_color() == _EXTERNAL_MATCH_COLORS[0]
 
     def test_overlays_a_marker_and_line_per_match_for_multiple_counterparts(self):
         # An HI detection can have more than one real optical counterpart (an
@@ -382,15 +383,23 @@ class TestExternalRedshiftMatchOverlay:
         assert "DESI z=0.0520" in opt_labels
 
         ax_spec = fig.axes[2]
-        vline_x = sorted(
-            ln.get_xdata()[0]
+        match_lines = [
+            ln
             for ln in ax_spec.lines
-            if ln.get_linestyle() == "--" and ln.get_color() == _EXTERNAL_MATCH_COLOR
-        )
+            if ln.get_linestyle() == "--" and ln.get_color() in _EXTERNAL_MATCH_COLORS
+        ]
+        assert len(match_lines) == 2
+        vline_x = sorted(ln.get_xdata()[0] for ln in match_lines)
         expected = sorted(
             [conversions.redshift_to_velocity(0.05), conversions.redshift_to_velocity(0.052)]
         )
         assert vline_x == pytest.approx(expected)
+        # Each match gets its own color, not just its own position -- distinguishable
+        # even if two matches happened to sit at the same velocity.
+        assert {ln.get_color() for ln in match_lines} == {
+            _EXTERNAL_MATCH_COLORS[0],
+            _EXTERNAL_MATCH_COLORS[1],
+        }
 
     def test_falls_back_to_a_generic_label_when_catalogue_name_column_is_missing(self):
         # A match produced before external_catalogue_name existed -- must still show

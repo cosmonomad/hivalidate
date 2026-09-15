@@ -88,12 +88,14 @@ def test_dedup_crossmatches_against_an_external_redshift_catalogue_when_configur
         external_path, format="votable"
     )
     config.paths.external_redshift_catalogue = external_path
+    config.paths.external_redshift_catalogue_name = "DESI"
 
     dedup.run(config)
     deduped = catalogue.read_votable(config.paths.deduped_catalogue)
     assert "external_z" in deduped.colnames
     matched_row = deduped[deduped["name"] == "SoFiA J203213.07-563318.1"]
     assert matched_row["external_z"][0] == pytest.approx(matching_z)
+    assert matched_row["external_catalogue_name"][0] == "DESI"
 
 
 def test_dedup_fails_clearly_if_combine_was_not_run_first(tmp_path):

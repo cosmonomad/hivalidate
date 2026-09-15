@@ -12,6 +12,7 @@ paths:
   # match crossmatch.read_external_catalogue's defaults (z, target_ra, target_dec),
   # so no override needed.
   external_redshift_catalogue: ../data/NGC4808/DESI_NGC4808.xml
+  external_redshift_catalogue_name: DESI
   field_mosaic: ../data/NGC4808/run_sofia/mom0.fits
 
 dedup:

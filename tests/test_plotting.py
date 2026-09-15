@@ -22,6 +22,7 @@ from matplotlib.patches import Ellipse
 from hivalidate import catalogue, conversions
 from hivalidate.cutouts.base import CutoutResult
 from hivalidate.plotting import (
+    _EXTERNAL_MATCH_COLOR,
     DISPLAY_FOV_FACTOR,
     build_validation_figure,
     load_source_cubelets,
@@ -316,7 +317,9 @@ class TestExternalRedshiftMatchOverlay:
     behaviour was dropped during the port.
     """
 
-    def _row_with_match(self, sep_arcsec: float = 5.0, z: float = 0.05) -> Table:
+    def _row_with_match(
+        self, sep_arcsec: float = 5.0, z: float = 0.05, catalogue_name: str | None = "DESI"
+    ) -> Table:
         row = _real_row()
         center = SkyCoord(ra=float(row["ra"]), dec=float(row["dec"]), unit="deg")
         match_pos = center.spherical_offsets_by(sep_arcsec * u.arcsec, 0 * u.arcsec)
@@ -324,10 +327,12 @@ class TestExternalRedshiftMatchOverlay:
         data["external_z"] = [z]
         data["external_ra"] = [match_pos.ra.deg]
         data["external_dec"] = [match_pos.dec.deg]
+        if catalogue_name is not None:
+            data["external_catalogue_name"] = [catalogue_name]
         return Table(data)[0]
 
-    def test_overlays_marker_and_spectrum_line_when_matched(self):
-        row = self._row_with_match(z=0.05)
+    def test_overlays_marker_and_spectrum_line_labelled_with_the_catalogue_name(self):
+        row = self._row_with_match(z=0.05, catalogue_name="DESI")
         cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
         fig = build_validation_figure(
             row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
@@ -336,19 +341,31 @@ class TestExternalRedshiftMatchOverlay:
         assert len(ax_opt.collections) >= 1  # the scatter marker
         opt_legend = ax_opt.get_legend()
         assert opt_legend is not None
-        assert any("External z=0.0500" in t.get_text() for t in opt_legend.get_texts())
+        assert any("DESI z=0.0500" in t.get_text() for t in opt_legend.get_texts())
 
         ax_spec = fig.axes[2]
         spec_legend = ax_spec.get_legend()
         assert spec_legend is not None
-        assert any("External z=0.0500" in t.get_text() for t in spec_legend.get_texts())
+        assert any("DESI z=0.0500" in t.get_text() for t in spec_legend.get_texts())
         expected_vel = conversions.redshift_to_velocity(0.05)
         vline_x = [
             ln.get_xdata()[0]
             for ln in ax_spec.lines
-            if ln.get_linestyle() == "--" and ln.get_color() == "C0"
+            if ln.get_linestyle() == "--" and ln.get_color() == _EXTERNAL_MATCH_COLOR
         ]
         assert vline_x == pytest.approx([expected_vel])
+
+    def test_falls_back_to_a_generic_label_when_catalogue_name_column_is_missing(self):
+        # A match produced before external_catalogue_name existed -- must still show
+        # something, not crash.
+        row = self._row_with_match(z=0.05, catalogue_name=None)
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        opt_legend = fig.axes[0].get_legend()
+        assert opt_legend is not None
+        assert any("External z=0.0500" in t.get_text() for t in opt_legend.get_texts())
 
     def test_no_overlay_when_row_has_no_external_match_columns(self):
         row = _real_row()

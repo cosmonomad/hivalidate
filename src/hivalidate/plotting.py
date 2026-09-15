@@ -186,6 +186,14 @@ _VMAX_SIGMA = 50.0
 _CONTINUUM_VMIN_SIGMA = 3.0
 _CONTINUUM_VMAX_SIGMA = 25.0
 
+#: Color for the external-redshift-match marker/line (see _external_match). Not
+#: "C0"/"C1"/etc: the mom0 contour panel already cycles through C0-C5 for its six
+#: levels (`contour_levels` in build_validation_figure), and the beam ellipse is
+#: "C3" -- picked by direct user feedback after "C0" turned out to be the same blue
+#: as one of the contour levels. Magenta isn't in that cycle and reads clearly
+#: against both the optical panel's greyscale and the continuum panel's afmhot.
+_EXTERNAL_MATCH_COLOR = "magenta"
+
 
 def _background_anchored_norm(
     data: np.ndarray, vmin_sigma: float = 1.0, vmax_sigma: float = _VMAX_SIGMA
@@ -312,7 +320,7 @@ def build_validation_figure(
         )
         ax_opt.add_patch(ellipse)
         if external_match is not None:
-            match_ra, match_dec, _, match_z = external_match
+            match_ra, match_dec, _, match_z, match_catalogue = external_match
             ax_opt.scatter(
                 match_ra,
                 match_dec,
@@ -320,8 +328,8 @@ def build_validation_figure(
                 s=60,
                 marker="x",
                 lw=2.0,
-                color="C0",
-                label=f"External z={match_z:.4f}",
+                color=_EXTERNAL_MATCH_COLOR,
+                label=f"{match_catalogue} z={match_z:.4f}",
             )
             ax_opt.legend(loc="upper left", frameon=True)
         ax_opt.set_title(f"Optical ({_provenance_backend(optical.provenance)})", size=12)
@@ -363,9 +371,13 @@ def build_validation_figure(
     ax_spec.axvline(v_sys, color="grey", ls="dotted")
     ax_spec.axhline(0, color="grey", ls="dotted")
     if external_match is not None:
-        _, _, match_vel_km_s, match_z = external_match
+        _, _, match_vel_km_s, match_z, match_catalogue = external_match
         ax_spec.axvline(
-            match_vel_km_s, color="C0", ls="dashed", lw=1.5, label=f"External z={match_z:.4f}"
+            match_vel_km_s,
+            color=_EXTERNAL_MATCH_COLOR,
+            ls="dashed",
+            lw=1.5,
+            label=f"{match_catalogue} z={match_z:.4f}",
         )
         ax_spec.legend(loc="upper left", frameon=False)
     ax_spec.set_xlabel("Velocity (km/s)", fontsize=14)
@@ -498,22 +510,31 @@ def _is_missing(value) -> bool:
     return bool(np.isnan(value))
 
 
-def _external_match(row: Row) -> tuple[float, float, float, float] | None:
-    """(ra, dec, velocity_km_s, z) of this source's `hivalidate.crossmatch` external
-    redshift match, or None if it wasn't cross-matched (no external redshift
-    catalogue configured, or no match within tolerance -- both leave
-    `row["external_z"]` missing, see `_is_missing`). `row` is a plain SoFiA
-    catalogue row when crossmatching wasn't run at all, so the columns may not
-    exist; that's the same "not matched" outcome as an explicit no-match.
+def _external_match(row: Row) -> tuple[float, float, float, float, str] | None:
+    """(ra, dec, velocity_km_s, z, catalogue_name) of this source's
+    `hivalidate.crossmatch` external redshift match, or None if it wasn't
+    cross-matched (no external redshift catalogue configured, or no match within
+    tolerance -- both leave `row["external_z"]` missing, see `_is_missing`). `row`
+    is a plain SoFiA catalogue row when crossmatching wasn't run at all, so the
+    columns may not exist; that's the same "not matched" outcome as an explicit
+    no-match. `catalogue_name` (e.g. "DESI", "GAMA" -- see
+    `Config.paths.external_redshift_catalogue_name`) falls back to a generic
+    "External" if the column is missing, for a match produced before that column
+    existed.
     """
     if "external_z" not in row.colnames or _is_missing(row["external_z"]):
         return None
     ext_z = float(row["external_z"])
+    if "external_catalogue_name" in row.colnames:
+        catalogue_name = str(row["external_catalogue_name"])
+    else:
+        catalogue_name = "External"
     return (
         float(row["external_ra"]),
         float(row["external_dec"]),
         conversions.redshift_to_velocity(ext_z),
         ext_z,
+        catalogue_name,
     )
 
 

@@ -58,6 +58,7 @@ def crossmatch_redshifts(
     sep_arcsec: float = 30.0,
     vel_tol_base_km_s: float = 30.0,
     vel_tol_wm50_factor: float = 0.6,
+    catalogue_name: str = "External",
 ) -> CrossmatchResult:
     """Cross-match each row of `hi_table` (a SoFiA catalogue) against
     `external_table` (see `read_external_catalogue`) by position + velocity -- the
@@ -72,8 +73,8 @@ def crossmatch_redshifts(
     reliable end of a broad-lined HI detection's centroid); that match only counts
     if it also falls within `sep_arcsec` and the velocity tolerance above.
 
-    Adds five columns to a copy of `hi_table`, NaN where a row has no match within
-    tolerance:
+    Adds six columns to a copy of `hi_table`, NaN (or, for `external_catalogue_name`,
+    empty) where a row has no match within tolerance:
 
     - ``external_z``: the matched row's redshift
     - ``external_ra``/``external_dec``: the matched row's sky position -- kept (not
@@ -82,6 +83,10 @@ def crossmatch_redshifts(
       GAMA cross-matches
     - ``external_sep_arcsec``: angular separation to the matched row
     - ``external_vel_diff_km_s``: |HI velocity - matched optical velocity|
+    - ``external_catalogue_name``: `catalogue_name` verbatim, for every row -- lets
+      the figure label a match "DESI z=..." / "GAMA z=..." instead of a generic
+      "External z=...", per direct user feedback that the generic label wasn't
+      informative enough once more than one kind of catalogue could be in play.
 
     Returns
     -------
@@ -94,6 +99,7 @@ def crossmatch_redshifts(
     external_dec = np.full(n, np.nan)
     external_sep_arcsec = np.full(n, np.nan)
     external_vel_diff_km_s = np.full(n, np.nan)
+    external_catalogue_name = np.full(n, "", dtype=object)
 
     if n > 0 and len(external_table) > 0:
         hi_coords = SkyCoord(ra=hi_table["ra"], dec=hi_table["dec"], unit="deg")
@@ -119,10 +125,12 @@ def crossmatch_redshifts(
         external_dec[matched] = ext_dec[idx[matched]]
         external_sep_arcsec[matched] = sep2d.arcsec[matched]
         external_vel_diff_km_s[matched] = vel_diff_km_s[matched]
+        external_catalogue_name[matched] = catalogue_name
 
     hi_table["external_z"] = external_z
     hi_table["external_ra"] = external_ra
     hi_table["external_dec"] = external_dec
     hi_table["external_sep_arcsec"] = external_sep_arcsec
     hi_table["external_vel_diff_km_s"] = external_vel_diff_km_s
+    hi_table["external_catalogue_name"] = external_catalogue_name
     return CrossmatchResult(table=hi_table, n_matched=int(np.sum(~np.isnan(external_z))))

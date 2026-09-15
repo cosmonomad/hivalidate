@@ -115,9 +115,13 @@ as its `--config` argument -- no per-field values are hardcoded in the package.
 Set `paths.external_redshift_catalogue` to cross-match every surviving detection
 against an external spectroscopic redshift catalogue (DESI, GAMA, or similar) by
 position + velocity -- `hivalidate-dedup` runs it automatically right after
-deduplication when this is set, adding `external_z`/`external_sep_arcsec`/
-`external_vel_diff_km_s` columns to the deduped catalogue (NaN where nothing matched
-within tolerance). Skipped entirely if left unset.
+deduplication when this is set, adding `external_z`/`external_ra`/`external_dec`/
+`external_sep_arcsec`/`external_vel_diff_km_s`/`external_catalogue_name` columns to
+the deduped catalogue (NaN/empty where nothing matched within tolerance). Skipped
+entirely if left unset. `paths.external_redshift_catalogue_name` (e.g. `"DESI"`,
+`"GAMA"`, default `"External"`) labels the match marker/line
+`build_validation_figure` overlays on the optical panel and spectrum for any
+cross-matched source.
 
 The catalogue file's format is auto-detected (VOTable XML, FITS, CSV, ...) via
 astropy's unified I/O -- verified against a real DESI VOTable-XML TAP query result

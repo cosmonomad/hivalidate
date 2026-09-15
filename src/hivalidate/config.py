@@ -74,6 +74,12 @@ class Paths:
     #: auto-detect (VOTable XML, FITS, CSV, ...) -- not tied to one survey/format.
     #: Optional -- crossmatching is skipped (not an error) if unset.
     external_redshift_catalogue: Path | None = None
+    #: Name of the survey external_redshift_catalogue comes from (e.g. "DESI",
+    #: "GAMA") -- used only to label the cross-match marker/line on the validation
+    #: figure (plotting._external_match), not inferred from the file name/path,
+    #: since that's not a reliable source of truth. Defaults to a generic label if
+    #: left unset.
+    external_redshift_catalogue_name: str = "External"
     #: Full-field moment-0 mosaic (SoFiA's own output, e.g. `run_sofia/mom0.fits`),
     #: used only by Phase 5 postprocess to place true-flagged detections in context.
     #: Optional -- the mosaic step is skipped (not an error) if unset.
@@ -145,6 +151,9 @@ class Config:
                 work_dir=resolve(raw_paths["work_dir"]),
                 continuum_local_dir=resolve(raw_paths.get("continuum_local_dir")),
                 external_redshift_catalogue=resolve(raw_paths.get("external_redshift_catalogue")),
+                external_redshift_catalogue_name=raw_paths.get(
+                    "external_redshift_catalogue_name", "External"
+                ),
                 field_mosaic=resolve(raw_paths.get("field_mosaic")),
             )
         except KeyError as exc:

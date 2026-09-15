@@ -53,9 +53,13 @@ def run(config: Config) -> None:
             sep_arcsec=config.dedup.sep_arcsec,
             vel_tol_base_km_s=config.dedup.vel_tol_base_km_s,
             vel_tol_wm50_factor=config.dedup.vel_tol_wm50_factor,
+            catalogue_name=config.paths.external_redshift_catalogue_name,
         )
         logger.info(
-            "Matched %d/%d sources to an external redshift", cx_result.n_matched, len(deduped)
+            "Matched %d/%d sources to a %s redshift",
+            cx_result.n_matched,
+            len(deduped),
+            config.paths.external_redshift_catalogue_name,
         )
         deduped = cx_result.table
 

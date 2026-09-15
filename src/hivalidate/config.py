@@ -24,8 +24,12 @@ class DedupSettings:
     """Positional/velocity cross-match tolerance for deduplicating sources that were
     independently detected in more than one per-run SoFiA catalogue (adjacent
     sub-cube runs can both catch a source near their shared boundary -- see PLAN.md
-    issue #5). Velocity tolerance follows the same functional form already used for
-    GAMA cross-matching in the legacy script: ``vel_tol = wm50_factor * wm50 + base_km_s``.
+    issue #5). Velocity tolerance follows the same functional form the legacy
+    script used for its GAMA cross-match: ``vel_tol = wm50_factor * wm50 +
+    base_km_s``. Reused as-is by `crossmatch.crossmatch_redshifts` (run by
+    `hivalidate-dedup` when `paths.external_redshift_catalogue` is set) -- one
+    tolerance definition for both kinds of position/velocity matching, rather than
+    a second copy of these three settings.
     """
 
     sep_arcsec: float = 30.0
@@ -64,7 +68,12 @@ class Paths:
     raw_sofia_dir: Path
     work_dir: Path
     continuum_local_dir: Path | None = None
-    gama_catalogue: Path | None = None
+    #: External spectroscopic redshift catalogue (DESI, GAMA, or similar) for
+    #: crossmatch.crossmatch_redshifts, run by hivalidate-dedup right after
+    #: deduplication when this is set. Any format astropy's Table.read can
+    #: auto-detect (VOTable XML, FITS, CSV, ...) -- not tied to one survey/format.
+    #: Optional -- crossmatching is skipped (not an error) if unset.
+    external_redshift_catalogue: Path | None = None
     #: Full-field moment-0 mosaic (SoFiA's own output, e.g. `run_sofia/mom0.fits`),
     #: used only by Phase 5 postprocess to place true-flagged detections in context.
     #: Optional -- the mosaic step is skipped (not an error) if unset.
@@ -135,7 +144,7 @@ class Config:
                 raw_sofia_dir=resolve(raw_paths["raw_sofia_dir"]),
                 work_dir=resolve(raw_paths["work_dir"]),
                 continuum_local_dir=resolve(raw_paths.get("continuum_local_dir")),
-                gama_catalogue=resolve(raw_paths.get("gama_catalogue")),
+                external_redshift_catalogue=resolve(raw_paths.get("external_redshift_catalogue")),
                 field_mosaic=resolve(raw_paths.get("field_mosaic")),
             )
         except KeyError as exc:
@@ -169,7 +178,8 @@ class Config:
             raise ValueError(
                 f"paths.continuum_local_dir does not exist or is not a directory: {continuum_dir}"
             )
-        if self.paths.gama_catalogue is not None and not self.paths.gama_catalogue.is_file():
-            raise ValueError(f"paths.gama_catalogue does not exist: {self.paths.gama_catalogue}")
+        ext_cat = self.paths.external_redshift_catalogue
+        if ext_cat is not None and not ext_cat.is_file():
+            raise ValueError(f"paths.external_redshift_catalogue does not exist: {ext_cat}")
         if self.paths.field_mosaic is not None and not self.paths.field_mosaic.is_file():
             raise ValueError(f"paths.field_mosaic does not exist: {self.paths.field_mosaic}")

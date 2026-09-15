@@ -7,7 +7,7 @@ paths:
   raw_sofia_dir: run_sofia_mini
   work_dir: work
   continuum_local_dir: null
-  gama_catalogue: null
+  external_redshift_catalogue: null
 
 dedup:
   sep_arcsec: 30.0

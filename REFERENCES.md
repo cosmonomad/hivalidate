@@ -18,11 +18,17 @@ scripts being migrated.
 ## Surveys used for cutouts / cross-matching
 
 - **[GAMA]** Driver, S. P., et al. 2011, "Galaxy and Mass Assembly (GAMA): survey
-  diagnostics and core data release", MNRAS, 413, 971. Not yet used by any code in
-  this repo -- `Config.paths.gama_catalogue` exists in the schema, but the actual
-  cross-match (ported from the legacy script's `search_gama`) is explicitly out of
-  scope for v1 (PLAN.md section 7, "Explicit non-goals"). Kept here so the citation
-  is ready when/if that's built.
+  diagnostics and core data release", MNRAS, 413, 971. `hivalidate.crossmatch` (added
+  2026-09-15, superseding the v1 "explicit non-goal" in PLAN.md section 7) can
+  cross-match against a GAMA-format catalogue via `Config.paths.
+  external_redshift_catalogue` -- pass GAMA's own `RA`/`DEC`/`Z` column names to
+  `crossmatch.read_external_catalogue`. Not yet tested against a real GAMA file
+  (only DESI, see [DESI] below); kept here since the config path is generic enough
+  to support it.
+- **[DESI]** DESI Collaboration, Dark Energy Spectroscopic Instrument. Public
+  redshift catalogues accessed via a TAP query against `desi_dr1.agngal` /
+  `desi_dr1.photometry`: https://data.desi.lbl.gov/. What `hivalidate.crossmatch`
+  was actually built and tested against (dev session 2026-09-15).
 - **[DSS2]** STScI Digitized Sky Survey II, accessed via `astroquery.skyview`.
 - **[LegacySurvey]** Dey, A., et al. 2019, "Overview of the DESI Legacy Imaging
   Surveys", AJ, 157, 168. Cutout service: https://www.legacysurvey.org/

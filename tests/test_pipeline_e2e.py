@@ -6,7 +6,11 @@ exactly as `hivalidate-combine`/`-dedup`/`-rename` would.
 
 from pathlib import Path
 
-from hivalidate import catalogue
+import pytest
+from astropy.coordinates import SkyCoord
+from astropy.table import Table
+
+from hivalidate import catalogue, conversions
 from hivalidate.cli import combine, dedup, rename
 from hivalidate.config import Config
 
@@ -66,6 +70,30 @@ def test_combine_dedup_rename_pipeline_end_to_end(tmp_path):
         / f"{surviving_run}_{surviving_id}_cube.fits"
     )
     assert copied.read_bytes() == expected_source.read_bytes()
+
+
+def test_dedup_crossmatches_against_an_external_redshift_catalogue_when_configured(tmp_path):
+    config = _load_config(tmp_path)
+    combine.run(config)
+    combined = catalogue.read_votable(config.paths.combined_catalogue)
+    deduped_no_crossmatch = catalogue.deduplicate_positional(combined).table
+    row = deduped_no_crossmatch[deduped_no_crossmatch["name"] == "SoFiA J203213.07-563318.1"]
+    assert len(row) == 1, "fixture assumption changed -- update this test"
+
+    center = SkyCoord(ra=float(row["ra"][0]), dec=float(row["dec"][0]), unit="deg")
+    velocity_km_s = conversions.freq_to_velocity(float(row["freq"][0]))
+    matching_z = velocity_km_s / conversions.SPEED_OF_LIGHT_KM_S
+    external_path = tmp_path / "external_redshifts.xml"
+    Table({"z": [matching_z], "target_ra": [center.ra.deg], "target_dec": [center.dec.deg]}).write(
+        external_path, format="votable"
+    )
+    config.paths.external_redshift_catalogue = external_path
+
+    dedup.run(config)
+    deduped = catalogue.read_votable(config.paths.deduped_catalogue)
+    assert "external_z" in deduped.colnames
+    matched_row = deduped[deduped["name"] == "SoFiA J203213.07-563318.1"]
+    assert matched_row["external_z"][0] == pytest.approx(matching_z)
 
 
 def test_dedup_fails_clearly_if_combine_was_not_run_first(tmp_path):

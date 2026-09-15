@@ -1,0 +1,32 @@
+# Test config for validating hivalidate.crossmatch against a real external
+# (DESI) redshift catalogue. Paths are relative to this file's directory unless
+# absolute. Mirrors configs/SB82605.yaml's structure.
+
+field_name: NGC4808
+
+paths:
+  raw_sofia_dir: ../data/NGC4808/run_sofia
+  work_dir: ../data/work/NGC4808
+  continuum_local_dir: ../data/NGC4808/continuum_image
+  # DESI DR1 agngal x photometry TAP query result (VOTable XML) -- column names
+  # match crossmatch.read_external_catalogue's defaults (z, target_ra, target_dec),
+  # so no override needed.
+  external_redshift_catalogue: ../data/NGC4808/DESI_NGC4808.xml
+  field_mosaic: ../data/NGC4808/run_sofia/mom0.fits
+
+dedup:
+  sep_arcsec: 30.0
+  vel_tol_base_km_s: 30.0
+  vel_tol_wm50_factor: 0.6
+
+cosmology:
+  h0: 70.0
+  om0: 0.3
+  tcmb0: 2.725
+
+cutouts:
+  optical_priority: [skyview, legacy_survey]
+  continuum_priority: [local, racs_casda]
+  cache_dir: ../data/cutout_cache
+  casda_username_env: CASDA_USERNAME
+  casda_password_env: CASDA_PASSWORD

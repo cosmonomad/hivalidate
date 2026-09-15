@@ -38,6 +38,21 @@ def test_freq_to_velocity_rejects_unknown_frame():
         conv.freq_to_velocity(conv.HI_REST_FREQ_HZ, v_frame="bogus")
 
 
+def test_redshift_to_velocity_matches_definition():
+    assert conv.redshift_to_velocity(0.05) == pytest.approx(conv.SPEED_OF_LIGHT_KM_S * 0.05)
+
+
+def test_redshift_to_velocity_agrees_with_freq_to_velocity_optical():
+    # Same physical source, two different starting points (a frequency vs. its
+    # equivalent redshift) -- should land on the same velocity, since z = f_HI/f_obs
+    # - 1 is exactly what freq_to_velocity's optical branch already computes.
+    freq = conv.HI_REST_FREQ_HZ * 0.98
+    z = conv.freq_to_redshift(freq)
+    assert conv.redshift_to_velocity(z) == pytest.approx(
+        conv.freq_to_velocity(freq, v_frame="optical")
+    )
+
+
 def test_velocity_to_freq_is_inverse_of_freq_to_velocity_optical():
     freq_in = conv.HI_REST_FREQ_HZ * 0.995
     vel_km_s = conv.freq_to_velocity(freq_in, v_frame="optical")

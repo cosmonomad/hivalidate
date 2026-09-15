@@ -75,6 +75,16 @@ def velocity_to_freq(vel_m_s: np.ndarray | float, v_frame: str = "optical") -> n
     raise ValueError(f"Unsupported velocity frame: {v_frame!r} (use 'optical' or 'radio')")
 
 
+def redshift_to_velocity(z: np.ndarray | float) -> np.ndarray | float:
+    """Convert a directly-quoted spectroscopic redshift to line-of-sight velocity,
+    optical convention: v = c*z. The same convention `freq_to_velocity`'s default
+    branch uses (there, z = f_HI/f_obs - 1, so c*z is exactly c*(f_HI/f_obs - 1)) --
+    this puts an external catalogue's own redshift column on the same velocity
+    scale as an HI detection's `freq_to_velocity`, for `hivalidate.crossmatch`.
+    """
+    return SPEED_OF_LIGHT_KM_S * z
+
+
 def freq_width_to_velocity_dispersion(
     freq_width_hz: np.ndarray | float, freq_centre_hz: np.ndarray | float
 ) -> np.ndarray | float:

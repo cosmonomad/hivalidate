@@ -110,6 +110,24 @@ Each field/SB gets its own YAML config under `configs/` (see `configs/SB82605.ya
 for the example used against `data/run_sofia/`). Every CLI stage takes a config file
 as its `--config` argument -- no per-field values are hardcoded in the package.
 
+### External redshift cross-matching (optional)
+
+Set `paths.external_redshift_catalogue` to cross-match every surviving detection
+against an external spectroscopic redshift catalogue (DESI, GAMA, or similar) by
+position + velocity -- `hivalidate-dedup` runs it automatically right after
+deduplication when this is set, adding `external_z`/`external_sep_arcsec`/
+`external_vel_diff_km_s` columns to the deduped catalogue (NaN where nothing matched
+within tolerance). Skipped entirely if left unset.
+
+The catalogue file's format is auto-detected (VOTable XML, FITS, CSV, ...) via
+astropy's unified I/O -- verified against a real DESI VOTable-XML TAP query result
+(`configs/NGC4808.yaml`). If your catalogue doesn't use DESI's own `target_ra`/
+`target_dec`/`z` column names (e.g. GAMA's `RA`/`DEC`/`Z`), pass the right names to
+`hivalidate.crossmatch.read_external_catalogue`/`crossmatch_redshifts` if calling
+these directly -- the CLI stage itself currently assumes DESI's naming.
+Position/velocity tolerance reuses the same `dedup:` settings (`sep_arcsec`,
+`vel_tol_base_km_s`, `vel_tol_wm50_factor`) used for self-deduplication.
+
 ## CASDA / RACS access
 
 The continuum cutout fallback (used when no local continuum mosaic covers a field)
@@ -212,7 +230,7 @@ Never put credentials in a config file that gets committed to git.
 |---|---|---|
 | Connectivity check | `hivalidate-check-connectivity` | Verify every configured cutout backend before a big batch run |
 | Combine | `hivalidate-combine` | Merge per-run SoFiA catalogues into one |
-| Dedup | `hivalidate-dedup` | Positional/velocity cross-match dedup, not string match |
+| Dedup | `hivalidate-dedup` | Positional/velocity cross-match dedup, not string match; also cross-matches against an external redshift catalogue if configured |
 | Rename | `hivalidate-rename` | Map per-run numeric IDs to source names, copy cubelets |
 | Dry-run | `hivalidate-dry-run` | Batch-generate validation plots, HPC-safe (`Agg`, no prompts) |
 | QA | `hivalidate-qa` | Interactive review of dry-run output; run locally, not on HPC |

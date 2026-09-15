@@ -54,7 +54,6 @@ class CutoutSettings:
 
     optical_priority: list[str] = field(default_factory=lambda: ["skyview", "legacy_survey"])
     continuum_priority: list[str] = field(default_factory=lambda: ["local", "racs_casda"])
-    cutout_size_pix: int = 256
     cache_dir: Path | None = None
     casda_username_env: str = "CASDA_USERNAME"
     casda_password_env: str = "CASDA_PASSWORD"

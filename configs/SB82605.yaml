@@ -29,7 +29,6 @@ cosmology:
 cutouts:
   optical_priority: [skyview, legacy_survey]
   continuum_priority: [local, racs_casda]
-  cutout_size_pix: 256
   cache_dir: ../data/cutout_cache
   casda_username_env: CASDA_USERNAME
   casda_password_env: CASDA_PASSWORD

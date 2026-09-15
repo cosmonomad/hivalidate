@@ -13,8 +13,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 from astropy import units as u
+from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from matplotlib.figure import Figure
+from matplotlib.patches import Ellipse
 
 from hivalidate import catalogue
 from hivalidate.cutouts.base import CutoutResult
@@ -249,3 +251,57 @@ class TestAllSkyPanelsShareTheSameFieldOfView:
         width, height = _axis_fov_arcsec(ax_cont)
         assert width == pytest.approx(expected_fov, rel=0.05)
         assert height == pytest.approx(expected_fov, rel=0.05)
+
+
+class TestBeamEllipsePlacement:
+    """Regression tests for the bug reported live 2026-09-15: the beam ellipse was
+    placed via a fixed 20-pixel offset in the cutout's own array, which only gives a
+    fixed real angular offset if every source's cutout shares the same pixel scale
+    and pixel count -- false in general (SkyView returns a fixed 300x300 pixel image
+    regardless of the requested angular size). For a source with a smaller real
+    field of view, that offset put the ellipse's own extent past the displayed zoom
+    window on one or both axes -- clipped by the panel edge, per direct user report.
+    """
+
+    def _beam_pixel_offset_and_radius(self, fig, cubelets, center):
+        ax_opt = fig.axes[0]
+        ellipses = [p for p in ax_opt.patches if isinstance(p, Ellipse)]
+        assert len(ellipses) == 1, "expected exactly one beam ellipse patch"
+        wcs = ax_opt.wcs.celestial
+        px, py = wcs.world_to_pixel_values(*ellipses[0].center)
+        cx, cy = wcs.world_to_pixel_values(center.ra.deg, center.dec.deg)
+        scales = wcs.proj_plane_pixel_scales()
+        dx_arcsec = abs(px - cx) * scales[0].to(u.arcsec).value
+        dy_arcsec = abs(py - cy) * scales[1].to(u.arcsec).value
+        return dx_arcsec, dy_arcsec, cubelets.beam_maj_arcsec / 2
+
+    def test_beam_ellipse_stays_fully_within_the_displayed_field_of_view(self):
+        row = _real_row()
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fov_arcsec = reference_field_of_view_arcsec(cubelets)
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        center = SkyCoord(ra=row["ra"], dec=row["dec"], unit="deg")
+        dx, dy, beam_half = self._beam_pixel_offset_and_radius(fig, cubelets, center)
+        assert dx + beam_half <= fov_arcsec / 2
+        assert dy + beam_half <= fov_arcsec / 2
+
+    def test_stays_within_bounds_against_a_skyview_shaped_cutout(self):
+        # Reproduces the real failure mode: a fixed 300x300 pixel cutout (SkyView's
+        # actual behaviour) whose own pixel scale is derived from this specific
+        # source's real field of view, not a hand-picked one -- confirmed to clip
+        # under the old fixed-20-pixel-offset logic before this fix.
+        row = _real_row()
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fov_arcsec = reference_field_of_view_arcsec(cubelets)
+        center = SkyCoord(ra=row["ra"], dec=row["dec"], unit="deg")
+        skyview_shaped_optical = _fake_cutout(
+            size=300, ra=center.ra.deg, dec=center.dec.deg, arcsec_per_pix=fov_arcsec / 300
+        )
+        fig = build_validation_figure(
+            row, cubelets, optical=skyview_shaped_optical, continuum=_fake_cutout()
+        )
+        dx, dy, beam_half = self._beam_pixel_offset_and_radius(fig, cubelets, center)
+        assert dx + beam_half <= fov_arcsec / 2
+        assert dy + beam_half <= fov_arcsec / 2

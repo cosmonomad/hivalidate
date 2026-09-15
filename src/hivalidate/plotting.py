@@ -293,7 +293,7 @@ def build_validation_figure(
             col_density_map, levels=contour_levels_scaled, transform=ax_opt.get_transform(mom0_wcs)
         )
         ellipse = Ellipse(
-            _beam_location(display_wcs),
+            _beam_location(center, fov_arcsec, cubelets.beam_maj_arcsec),
             cubelets.beam_maj_arcsec / 3600,
             cubelets.beam_min_arcsec / 3600,
             angle=cubelets.beam_pa_deg,
@@ -428,12 +428,32 @@ def build_validation_figure(
     return fig
 
 
-def _beam_location(wcs: WCS) -> tuple[float, float]:
-    """Sky position for the beam ellipse -- bottom-left corner of the displayed
-    cutout, matching the legacy script's placement.
+def _beam_location(center: SkyCoord, fov_arcsec: float, beam_maj_arcsec: float) -> tuple[float, float]:
+    """Sky position for the beam ellipse -- inset from the displayed field of view's
+    bottom-left corner (matching the legacy script's placement) by enough real
+    angular distance that the ellipse (up to `beam_maj_arcsec` across) stays fully
+    inside the panel, regardless of which backend's native pixel scale/pixel count
+    supplied the displayed cutout.
+
+    An earlier version placed this via a fixed 20-pixel offset in the cutout's own
+    array -- that gives a fixed real angular offset only if every source's cutout
+    has the same pixel scale and pixel count, which it doesn't: SkyView returns a
+    fixed 300x300 pixel image regardless of the requested angular size, so for a
+    source with a smaller real field of view, pixel (20, 20) landed close enough to
+    the array's true corner that the ellipse's own extent (up to `beam_maj_arcsec`
+    across, drawn from that point) pushed past the *displayed* zoom window
+    `_set_fov` restricts each panel to and got clipped by the panel edge -- direct
+    user report, confirmed against real sources (dev session 2026-09-15): several
+    had the ellipse's edge crossing the display boundary on one or both axes.
+    Working entirely in real sky offsets from `center` removes any dependence on a
+    cutout's pixel grid.
     """
-    ra, dec = wcs.celestial.array_index_to_world_values(20, 20)
-    return float(ra), float(dec)
+    inset_arcsec = max(beam_maj_arcsec * 0.75, fov_arcsec * 0.08)
+    margin_arcsec = fov_arcsec / 2 - inset_arcsec
+    # RA increases toward the left in a standard sky image (origin="lower", negative
+    # CDELT1), so the bottom-left corner is at (+margin in RA, -margin in Dec).
+    location = center.spherical_offsets_by(margin_arcsec * u.arcsec, -margin_arcsec * u.arcsec)
+    return float(location.ra.deg), float(location.dec.deg)
 
 
 def _format_sky_axes(ax, *, ylabel: bool) -> None:

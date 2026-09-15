@@ -162,6 +162,33 @@ class TestCrossmatchRedshifts:
         matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME]
         assert matched_row["external_sep_arcsec"][0] == pytest.approx(1.0, abs=1e-3)
 
+    def test_a_closer_interloper_does_not_mask_a_farther_real_match(self):
+        # Regression test for a real bug (dev session 2026-09-15): an earlier version
+        # matched only the single nearest-position candidate and rejected the whole
+        # source if that one failed velocity tolerance, even when a farther-but-
+        # still-within-sep_arcsec candidate was a good velocity match. Confirmed
+        # against real DESI data: a positionally closer but physically unrelated
+        # interloper (~11,000 km/s away) masked a real counterpart sitting 15" away.
+        hi_table = _real_hi_table()
+        row = _real_source_row(hi_table)
+        center = SkyCoord(ra=float(row["ra"][0]), dec=float(row["dec"][0]), unit="deg")
+        interloper_pos = _offset_position(center, sep_arcsec=2.0)
+        real_match_pos = _offset_position(center, sep_arcsec=15.0)
+        matching_z = _matching_z(row)
+        interloper_z = matching_z + 10_000 / conversions.SPEED_OF_LIGHT_KM_S  # ~10,000 km/s away
+
+        external = Table(
+            {
+                "z": [interloper_z, matching_z],
+                "target_ra": [interloper_pos.ra.deg, real_match_pos.ra.deg],
+                "target_dec": [interloper_pos.dec.deg, real_match_pos.dec.deg],
+            }
+        )
+        result = crossmatch.crossmatch_redshifts(hi_table, external, sep_arcsec=30.0)
+        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME]
+        assert matched_row["external_z"][0] == pytest.approx(matching_z)
+        assert matched_row["external_sep_arcsec"][0] == pytest.approx(15.0, abs=1e-3)
+
     def test_empty_hi_table_is_a_no_op(self):
         hi_table = _real_hi_table()[:0]
         external = Table({"z": [0.01], "target_ra": [1.0], "target_dec": [1.0]})

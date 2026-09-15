@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
@@ -67,11 +68,16 @@ def crossmatch_redshifts(
     against an independent optical/spectroscopic redshift instead of another HI
     detection.
 
-    Each HI row is matched to its single nearest external-catalogue row by sky
-    position (`SkyCoord.match_to_catalog_sky` -- closest position wins when more
-    than one external row would otherwise qualify, since position is the more
-    reliable end of a broad-lined HI detection's centroid); that match only counts
-    if it also falls within `sep_arcsec` and the velocity tolerance above.
+    Every external-catalogue row within `sep_arcsec` of an HI row is considered a
+    candidate, not just the single nearest one: an earlier version used
+    `SkyCoord.match_to_catalog_sky` (nearest position only) and rejected that
+    source entirely if the *nearest* candidate failed the velocity tolerance, even
+    when a farther-but-still-within-`sep_arcsec` candidate was a good velocity
+    match -- confirmed against real data (dev session 2026-09-15): a positionally
+    closer but physically unrelated interloper (11,531 km/s away) masked a real
+    counterpart sitting 15" away (13-16 km/s away) for one source. Among the
+    candidates that pass *both* tolerances, the closest in position wins, since
+    position is the more reliable end of a broad-lined HI detection's centroid.
 
     Adds six columns to a copy of `hi_table`, NaN (or, for `external_catalogue_name`,
     empty) where a row has no match within tolerance:
@@ -111,21 +117,41 @@ def crossmatch_redshifts(
         hi_wm50_velocity_km_s = conversions.freq_width_to_velocity_dispersion(
             np.asarray(hi_table["wm50"]), np.asarray(hi_table["freq"])
         )
-        ext_velocity_km_s = conversions.redshift_to_velocity(
-            np.asarray(external_table[z_column])
-        )
-
-        idx, sep2d, _ = hi_coords.match_to_catalog_sky(ext_coords)
-        vel_diff_km_s = np.abs(hi_velocity_km_s - ext_velocity_km_s[idx])
+        ext_z = np.asarray(external_table[z_column])
+        ext_velocity_km_s = conversions.redshift_to_velocity(ext_z)
         vel_tol_km_s = vel_tol_wm50_factor * hi_wm50_velocity_km_s + vel_tol_base_km_s
-        matched = (sep2d.arcsec <= sep_arcsec) & (vel_diff_km_s <= vel_tol_km_s)
 
-        external_z[matched] = np.asarray(external_table[z_column])[idx[matched]]
-        external_ra[matched] = ext_ra[idx[matched]]
-        external_dec[matched] = ext_dec[idx[matched]]
-        external_sep_arcsec[matched] = sep2d.arcsec[matched]
-        external_vel_diff_km_s[matched] = vel_diff_km_s[matched]
-        external_catalogue_name[matched] = catalogue_name
+        # a.search_around_sky(b, sep) returns (idx_into_b, idx_into_a, sep2d, d3d) --
+        # the "self" indices come second, not first (verified empirically, not just
+        # assumed from the name).
+        idx_ext_pairs, idx_hi_pairs, sep2d, _ = hi_coords.search_around_sky(
+            ext_coords, sep_arcsec * u.arcsec
+        )
+        vel_diff_km_s = np.abs(hi_velocity_km_s[idx_hi_pairs] - ext_velocity_km_s[idx_ext_pairs])
+        within_vel = vel_diff_km_s <= vel_tol_km_s[idx_hi_pairs]
+
+        idx_hi_pairs = idx_hi_pairs[within_vel]
+        idx_ext_pairs = idx_ext_pairs[within_vel]
+        sep_arcsec_pairs = sep2d.arcsec[within_vel]
+        vel_diff_km_s = vel_diff_km_s[within_vel]
+
+        if len(idx_hi_pairs) > 0:
+            # Among each HI row's surviving candidates (passing both tolerances),
+            # keep only the closest in position: sort by (hi row, separation), then
+            # take the first row of each group.
+            order = np.lexsort((sep_arcsec_pairs, idx_hi_pairs))
+            idx_hi_sorted = idx_hi_pairs[order]
+            first_of_group = np.concatenate(([True], idx_hi_sorted[1:] != idx_hi_sorted[:-1]))
+            best = order[first_of_group]
+
+            matched_hi_idx = idx_hi_pairs[best]
+            matched_ext_idx = idx_ext_pairs[best]
+            external_z[matched_hi_idx] = ext_z[matched_ext_idx]
+            external_ra[matched_hi_idx] = ext_ra[matched_ext_idx]
+            external_dec[matched_hi_idx] = ext_dec[matched_ext_idx]
+            external_sep_arcsec[matched_hi_idx] = sep_arcsec_pairs[best]
+            external_vel_diff_km_s[matched_hi_idx] = vel_diff_km_s[best]
+            external_catalogue_name[matched_hi_idx] = catalogue_name
 
     hi_table["external_z"] = external_z
     hi_table["external_ra"] = external_ra

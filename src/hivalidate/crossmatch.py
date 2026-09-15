@@ -72,10 +72,14 @@ def crossmatch_redshifts(
     reliable end of a broad-lined HI detection's centroid); that match only counts
     if it also falls within `sep_arcsec` and the velocity tolerance above.
 
-    Adds three columns to a copy of `hi_table`, NaN where a row has no match within
+    Adds five columns to a copy of `hi_table`, NaN where a row has no match within
     tolerance:
 
     - ``external_z``: the matched row's redshift
+    - ``external_ra``/``external_dec``: the matched row's sky position -- kept (not
+      just the redshift) so `plotting.build_validation_figure` can overlay the
+      actual matched source on the optical panel, the way the legacy script did for
+      GAMA cross-matches
     - ``external_sep_arcsec``: angular separation to the matched row
     - ``external_vel_diff_km_s``: |HI velocity - matched optical velocity|
 
@@ -86,14 +90,16 @@ def crossmatch_redshifts(
     hi_table = hi_table.copy()
     n = len(hi_table)
     external_z = np.full(n, np.nan)
+    external_ra = np.full(n, np.nan)
+    external_dec = np.full(n, np.nan)
     external_sep_arcsec = np.full(n, np.nan)
     external_vel_diff_km_s = np.full(n, np.nan)
 
     if n > 0 and len(external_table) > 0:
         hi_coords = SkyCoord(ra=hi_table["ra"], dec=hi_table["dec"], unit="deg")
-        ext_coords = SkyCoord(
-            ra=external_table[ra_column], dec=external_table[dec_column], unit="deg"
-        )
+        ext_ra = np.asarray(external_table[ra_column])
+        ext_dec = np.asarray(external_table[dec_column])
+        ext_coords = SkyCoord(ra=ext_ra, dec=ext_dec, unit="deg")
 
         hi_velocity_km_s = conversions.freq_to_velocity(np.asarray(hi_table["freq"]))
         hi_wm50_velocity_km_s = conversions.freq_width_to_velocity_dispersion(
@@ -109,10 +115,14 @@ def crossmatch_redshifts(
         matched = (sep2d.arcsec <= sep_arcsec) & (vel_diff_km_s <= vel_tol_km_s)
 
         external_z[matched] = np.asarray(external_table[z_column])[idx[matched]]
+        external_ra[matched] = ext_ra[idx[matched]]
+        external_dec[matched] = ext_dec[idx[matched]]
         external_sep_arcsec[matched] = sep2d.arcsec[matched]
         external_vel_diff_km_s[matched] = vel_diff_km_s[matched]
 
     hi_table["external_z"] = external_z
+    hi_table["external_ra"] = external_ra
+    hi_table["external_dec"] = external_dec
     hi_table["external_sep_arcsec"] = external_sep_arcsec
     hi_table["external_vel_diff_km_s"] = external_vel_diff_km_s
     return CrossmatchResult(table=hi_table, n_matched=int(np.sum(~np.isnan(external_z))))

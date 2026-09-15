@@ -14,11 +14,12 @@ import numpy as np
 import pytest
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.table import Table
 from astropy.wcs import WCS
 from matplotlib.figure import Figure
 from matplotlib.patches import Ellipse
 
-from hivalidate import catalogue
+from hivalidate import catalogue, conversions
 from hivalidate.cutouts.base import CutoutResult
 from hivalidate.plotting import (
     DISPLAY_FOV_FACTOR,
@@ -305,3 +306,64 @@ class TestBeamEllipsePlacement:
         dx, dy, beam_half = self._beam_pixel_offset_and_radius(fig, cubelets, center)
         assert dx + beam_half <= fov_arcsec / 2
         assert dy + beam_half <= fov_arcsec / 2
+
+
+class TestExternalRedshiftMatchOverlay:
+    """Regression tests for the bug reported live 2026-09-15: hivalidate.crossmatch's
+    match columns were added to the catalogue but never actually shown on the
+    figure -- the legacy script overlaid a matched GAMA source as a marker on the
+    optical panel and a dashed line at its velocity on the spectrum panel, and that
+    behaviour was dropped during the port.
+    """
+
+    def _row_with_match(self, sep_arcsec: float = 5.0, z: float = 0.05) -> Table:
+        row = _real_row()
+        center = SkyCoord(ra=float(row["ra"]), dec=float(row["dec"]), unit="deg")
+        match_pos = center.spherical_offsets_by(sep_arcsec * u.arcsec, 0 * u.arcsec)
+        data = {name: [row[name]] for name in row.colnames}
+        data["external_z"] = [z]
+        data["external_ra"] = [match_pos.ra.deg]
+        data["external_dec"] = [match_pos.dec.deg]
+        return Table(data)[0]
+
+    def test_overlays_marker_and_spectrum_line_when_matched(self):
+        row = self._row_with_match(z=0.05)
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        ax_opt = fig.axes[0]
+        assert len(ax_opt.collections) >= 1  # the scatter marker
+        opt_legend = ax_opt.get_legend()
+        assert opt_legend is not None
+        assert any("External z=0.0500" in t.get_text() for t in opt_legend.get_texts())
+
+        ax_spec = fig.axes[2]
+        spec_legend = ax_spec.get_legend()
+        assert spec_legend is not None
+        assert any("External z=0.0500" in t.get_text() for t in spec_legend.get_texts())
+        expected_vel = conversions.redshift_to_velocity(0.05)
+        vline_x = [
+            ln.get_xdata()[0]
+            for ln in ax_spec.lines
+            if ln.get_linestyle() == "--" and ln.get_color() == "C0"
+        ]
+        assert vline_x == pytest.approx([expected_vel])
+
+    def test_no_overlay_when_row_has_no_external_match_columns(self):
+        row = _real_row()
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        assert fig.axes[0].get_legend() is None
+        assert fig.axes[2].get_legend() is None
+
+    def test_no_overlay_when_external_z_is_nan(self):
+        row = self._row_with_match(z=float("nan"))
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        assert fig.axes[0].get_legend() is None
+        assert fig.axes[2].get_legend() is None

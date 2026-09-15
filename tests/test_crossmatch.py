@@ -106,11 +106,14 @@ class TestCrossmatchRedshifts:
 
         matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME]
         assert matched_row["external_z"][0] == pytest.approx(matching_z)
+        assert matched_row["external_ra"][0] == pytest.approx(offset.ra.deg)
+        assert matched_row["external_dec"][0] == pytest.approx(offset.dec.deg)
         assert matched_row["external_sep_arcsec"][0] == pytest.approx(1.0, abs=1e-3)
         assert not np.isnan(matched_row["external_vel_diff_km_s"][0])
 
         other_rows = result.table[result.table["name"] != REAL_SOURCE_NAME]
         assert np.all(np.isnan(other_rows["external_z"]))
+        assert np.all(np.isnan(other_rows["external_ra"]))
 
     def test_position_within_tolerance_but_velocity_too_different_does_not_match(self):
         hi_table = _real_hi_table()

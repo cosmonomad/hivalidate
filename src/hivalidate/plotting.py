@@ -23,6 +23,13 @@ values that only happened to suit one specific field/SB:
   annotated directly on the figure, since there are now multiple possible sources
   per panel (PLAN.md section 5, "Provenance").
 
+If `row` has a `hivalidate.crossmatch` match (`external_z` etc. -- see
+`_external_match`), it's overlaid the same way the legacy script did for its GAMA
+cross-match: an 'x' marker at the matched position on the optical panel, and a
+dashed vertical line at its equivalent velocity on the spectrum panel, both labelled
+with the matched redshift. Silently omitted if `row` wasn't cross-matched (no
+external catalogue configured, or no match within tolerance) -- not an error.
+
 Every sky panel (optical, continuum, mom0, mom1) is pinned to the same real
 angular field of view, computed from the mom0 image's own WCS
 (`reference_field_of_view_arcsec`) -- not each panel's own auto-scaled image extent.
@@ -275,6 +282,7 @@ def build_validation_figure(
     display_wcs = optical.wcs if optical is not None else mom0_wcs
     center = SkyCoord(ra=row["ra"], dec=row["dec"], unit="deg")
     fov_arcsec = reference_field_of_view_arcsec(cubelets)
+    external_match = _external_match(row)
 
     fig = Figure(figsize=(18, 11))
     fig.subplots_adjust(left=0.05, right=0.98, wspace=0.1)
@@ -303,6 +311,19 @@ def build_validation_figure(
             transform=ax_opt.get_transform("fk5"),
         )
         ax_opt.add_patch(ellipse)
+        if external_match is not None:
+            match_ra, match_dec, _, match_z = external_match
+            ax_opt.scatter(
+                match_ra,
+                match_dec,
+                transform=ax_opt.get_transform("fk5"),
+                s=60,
+                marker="x",
+                lw=2.0,
+                color="C0",
+                label=f"External z={match_z:.4f}",
+            )
+            ax_opt.legend(loc="upper left", frameon=True)
         ax_opt.set_title(f"Optical ({_provenance_backend(optical.provenance)})", size=12)
     else:
         ax_opt.set_title("Optical (no cutout available)", size=12)
@@ -341,6 +362,12 @@ def build_validation_figure(
     ax_spec.plot(vel, cubelets.spec_flux_jy, color="k")
     ax_spec.axvline(v_sys, color="grey", ls="dotted")
     ax_spec.axhline(0, color="grey", ls="dotted")
+    if external_match is not None:
+        _, _, match_vel_km_s, match_z = external_match
+        ax_spec.axvline(
+            match_vel_km_s, color="C0", ls="dashed", lw=1.5, label=f"External z={match_z:.4f}"
+        )
+        ax_spec.legend(loc="upper left", frameon=False)
     ax_spec.set_xlabel("Velocity (km/s)", fontsize=14)
     ax_spec.set_ylabel("Flux density (Jy)", fontsize=14)
     ax_spec.annotate(
@@ -456,6 +483,38 @@ def _beam_location(
     # CDELT1), so the bottom-left corner is at (+margin in RA, -margin in Dec).
     location = center.spherical_offsets_by(margin_arcsec * u.arcsec, -margin_arcsec * u.arcsec)
     return float(location.ra.deg), float(location.dec.deg)
+
+
+def _is_missing(value) -> bool:
+    """True for either kind of "no value" a table cell can hold here: a plain NaN
+    float (what `crossmatch.crossmatch_redshifts` writes in-memory for an unmatched
+    row) or a masked constant (what the *same* NaN comes back as after a round trip
+    through `catalogue.write_votable`/`read_votable` -- VOTable round-trips NaN as
+    masked, and `np.isnan` on a masked constant silently evaluates falsy rather than
+    raising, so checking only `np.isnan` would treat an unmatched row as matched).
+    """
+    if np.ma.is_masked(value):
+        return True
+    return bool(np.isnan(value))
+
+
+def _external_match(row: Row) -> tuple[float, float, float, float] | None:
+    """(ra, dec, velocity_km_s, z) of this source's `hivalidate.crossmatch` external
+    redshift match, or None if it wasn't cross-matched (no external redshift
+    catalogue configured, or no match within tolerance -- both leave
+    `row["external_z"]` missing, see `_is_missing`). `row` is a plain SoFiA
+    catalogue row when crossmatching wasn't run at all, so the columns may not
+    exist; that's the same "not matched" outcome as an explicit no-match.
+    """
+    if "external_z" not in row.colnames or _is_missing(row["external_z"]):
+        return None
+    ext_z = float(row["external_z"])
+    return (
+        float(row["external_ra"]),
+        float(row["external_dec"]),
+        conversions.redshift_to_velocity(ext_z),
+        ext_z,
+    )
 
 
 def _format_sky_axes(ax, *, ylabel: bool) -> None:

@@ -1,6 +1,7 @@
 """Build post-validation artifacts (CSV, cubelets, dry-run plots, and -- true only --
-a mosaic) for every reviewed QA class (true/false/uncertain/duplicate), each under
-its own `postprocess/<class_name>/` subdirectory.
+a mosaic FITS plus an optical-background overview PNG) for every reviewed QA class
+(true/false/uncertain/duplicate), each under its own `postprocess/<class_name>/`
+subdirectory.
 
 Run `hivalidate-qa` first (or at least far enough into a session that some sources
 have been reviewed -- this can be run against a partially-reviewed catalogue; classes
@@ -12,9 +13,23 @@ from __future__ import annotations
 import logging
 import sys
 
-from hivalidate import catalogue, postprocess
-from hivalidate.cli._common import base_parser, configure_logging
-from hivalidate.config import Config
+import matplotlib
+
+matplotlib.use("Agg")  # must happen before pyplot/plotting is touched anywhere
+
+import matplotlib.pyplot as plt  # noqa: E402 -- only used to close figures, never to show them
+from astropy.io import fits  # noqa: E402
+from astropy.wcs import WCS  # noqa: E402
+
+from hivalidate import catalogue, plotting, postprocess  # noqa: E402
+from hivalidate.cli._common import base_parser, configure_logging  # noqa: E402
+from hivalidate.config import Config  # noqa: E402
+from hivalidate.cutouts.base import (  # noqa: E402
+    CutoutCache,
+    CutoutUnavailable,
+    fetch_with_fallback,
+)
+from hivalidate.cutouts.optical import SkyViewBackend  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +88,31 @@ def run(config: Config) -> None:
 
     mom0_files = sorted(true_cubelets_dir.glob("*_mom0.fits"))
     mosaic_path = config.paths.postprocess_dir / "true" / "mosaic_true.fits"
-    postprocess.build_mosaic(config.paths.field_mosaic, mom0_files, mosaic_path)
+    mosaic_data = postprocess.build_mosaic(config.paths.field_mosaic, mom0_files, mosaic_path)
     logger.info("Wrote %s from %d moment-0 maps", mosaic_path, len(mom0_files))
+
+    center, fov_arcsec = postprocess.field_center_and_fov(config.paths.field_mosaic)
+    cache = CutoutCache(config.cutouts.cache_dir) if config.cutouts.cache_dir else None
+    try:
+        # SkyViewBackend specifically, not config.cutouts.optical_priority's
+        # per-source chain -- see build_true_detections_overview_figure's docstring
+        # for why the per-source-oriented LegacySurveyBackend isn't a fit here.
+        optical = fetch_with_fallback(
+            center, fov_arcsec, config.field_name, [SkyViewBackend()], cache=cache
+        )
+    except CutoutUnavailable as exc:
+        logger.warning("Could not fetch a field-wide optical background, skipping: %s", exc)
+        optical = None
+
+    if optical is not None:
+        mosaic_wcs = WCS(fits.getheader(mosaic_path)).celestial
+        fig = plotting.build_true_detections_overview_figure(
+            optical, mosaic_data, mosaic_wcs, config.field_name
+        )
+        overview_path = config.paths.postprocess_dir / "true" / "mosaic_true_optical.png"
+        fig.savefig(overview_path, bbox_inches="tight", dpi=100)
+        plt.close(fig)
+        logger.info("Wrote %s", overview_path)
 
 
 def main(argv: list[str] | None = None) -> None:

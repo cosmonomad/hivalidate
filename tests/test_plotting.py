@@ -24,6 +24,7 @@ from hivalidate.cutouts.base import CutoutResult
 from hivalidate.plotting import (
     _EXTERNAL_MATCH_COLORS,
     DISPLAY_FOV_FACTOR,
+    build_true_detections_overview_figure,
     build_validation_figure,
     load_source_cubelets,
     reference_field_of_view_arcsec,
@@ -467,3 +468,46 @@ class TestExternalRedshiftMatchOverlay:
         )
         assert fig.axes[0].get_legend() is None
         assert fig.axes[2].get_legend() is None
+
+
+class TestBuildTrueDetectionsOverviewFigure:
+    """Direct user request: a whole-field overview showing true detections'
+    coadded moment-0 mosaic (postprocess.build_mosaic) as contours over an optical
+    background of the whole field, to see the overall spatial distribution at a
+    glance.
+    """
+
+    def _mosaic(self, data, size=50):
+        wcs = WCS(naxis=2)
+        wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
+        wcs.wcs.crval = [315.4611, -55.8032]
+        wcs.wcs.crpix = [size / 2, size / 2]
+        wcs.wcs.cdelt = [-6.0 / 3600, 6.0 / 3600]
+        return data, wcs
+
+    def test_produces_a_single_panel_figure_with_the_field_name_in_the_title(self):
+        optical = _fake_cutout(size=100, arcsec_per_pix=6.0)
+        mosaic_data, mosaic_wcs = self._mosaic(np.zeros((50, 50)))
+        fig = build_true_detections_overview_figure(optical, mosaic_data, mosaic_wcs, "SB82605")
+        assert isinstance(fig, Figure)
+        assert len(fig.axes) == 1
+        assert "SB82605" in fig.axes[0].get_title()
+
+    def test_all_zero_mosaic_does_not_raise(self):
+        # build_mosaic fills every pixel with no reprojected true-detection cubelet
+        # with exactly 0 -- a field with (so far) zero true detections is a
+        # legitimate state, not an error, and must not crash while trying to
+        # contour something that isn't there.
+        optical = _fake_cutout(size=100, arcsec_per_pix=6.0)
+        mosaic_data, mosaic_wcs = self._mosaic(np.zeros((50, 50)))
+        fig = build_true_detections_overview_figure(optical, mosaic_data, mosaic_wcs, "SB82605")
+        assert isinstance(fig, Figure)
+
+    def test_mosaic_with_real_signal_draws_contours(self):
+        optical = _fake_cutout(size=100, arcsec_per_pix=6.0)
+        rng = np.random.default_rng(0)
+        data = rng.normal(0, 1, size=(50, 50))
+        data[20:25, 20:25] += 50  # a clear detection well above the noise
+        mosaic_data, mosaic_wcs = self._mosaic(data)
+        fig = build_true_detections_overview_figure(optical, mosaic_data, mosaic_wcs, "SB82605")
+        assert len(fig.axes[0].collections) >= 1  # the contour

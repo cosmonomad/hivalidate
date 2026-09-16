@@ -12,6 +12,11 @@
 - A mosaic FITS of the true class's moment-0 maps, reprojected onto the full field --
   replaces `legacy/mosaic_sofia_true_detections.py`. True-only: "where are the real
   detections" is the only one of these four classes that question makes sense for.
+- A PNG of that same mosaic overlaid as contours on an optical background image of
+  the whole field, so the overall spatial distribution of real detections can be
+  seen against the sky at a glance (`hivalidate.plotting.
+  build_true_detections_overview_figure`, built by `hivalidate.cli.postprocess`
+  since it needs a network fetch) -- direct user request.
 """
 
 from __future__ import annotations
@@ -20,6 +25,8 @@ import shutil
 from pathlib import Path
 
 import numpy as np
+from astropy import units as u
+from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
 from astropy.wcs import WCS
@@ -134,3 +141,20 @@ def build_mosaic(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fits.writeto(output_path, data, header, overwrite=True)
     return data
+
+
+def field_center_and_fov(field_mosaic_path: str | Path) -> tuple[SkyCoord, float]:
+    """The real sky position/angular size of `field_mosaic_path`'s own footprint --
+    for fetching an optical background image the same size as the field
+    (`plotting.build_true_detections_overview_figure`). Same approach as
+    `plotting.reference_field_of_view_arcsec` (the real WCS pixel scale, not an
+    assumed constant) but for the whole field mosaic instead of one source's mom0.
+    """
+    header = fits.getheader(field_mosaic_path)
+    wcs = WCS(header).celestial
+    ny, nx = header["NAXIS2"], header["NAXIS1"]
+    scales = wcs.proj_plane_pixel_scales()
+    width_arcsec = (nx * scales[0]).to(u.arcsec).value
+    height_arcsec = (ny * scales[1]).to(u.arcsec).value
+    center = wcs.pixel_to_world(nx / 2, ny / 2)
+    return center, max(width_arcsec, height_arcsec)

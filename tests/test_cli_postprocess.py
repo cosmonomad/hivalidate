@@ -39,6 +39,25 @@ def _scripted(responses):
     return lambda source, position, total: next(it)
 
 
+def _stub_skyview_get_images(**kwargs):
+    """Stands in for `hivalidate.cutouts.optical.SkyView.get_images` -- the field
+    overview step (`hivalidate.cli.postprocess`) fetches a real field-wide SkyView
+    image, which would otherwise make these "no network" CLI tests hit the network
+    for real (found live: the test suite noticeably slowed down without this).
+    """
+    wcs = WCS(naxis=2)
+    wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
+    wcs.wcs.crval = [315.0, -55.0]
+    wcs.wcs.crpix = [150, 150]
+    wcs.wcs.cdelt = [-6.0 / 3600, 6.0 / 3600]
+
+    class _FakeHDU:
+        data = np.ones((300, 300))
+        header = wcs.to_header()
+
+    return [[_FakeHDU()]]
+
+
 @pytest.fixture
 def validated_config(tmp_path, monkeypatch):
     config = Config.from_yaml(FIXTURES / "config_mini.yaml")
@@ -119,9 +138,12 @@ class TestPostprocessCli:
         assert len(plot_files) == len(this_class_names)
         assert {f.stem for f in plot_files} == this_class_names
 
-    def test_builds_mosaic_when_field_mosaic_configured(self, validated_config):
+    def test_builds_mosaic_when_field_mosaic_configured(self, validated_config, monkeypatch):
         # config_mini.yaml has no field_mosaic -- point it at a tiny synthetic one to
         # exercise the mosaic branch end-to-end through the real CLI.
+        monkeypatch.setattr(
+            "hivalidate.cutouts.optical.SkyView.get_images", _stub_skyview_get_images
+        )
         field_wcs = WCS(naxis=2)
         field_wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
         field_wcs.wcs.crval = [315.0, -55.0]
@@ -137,12 +159,18 @@ class TestPostprocessCli:
         assert mosaic_path.exists()
         assert fits.getdata(mosaic_path).shape == (1000, 1000)
 
+        overview_path = validated_config.paths.postprocess_dir / "true" / "mosaic_true_optical.png"
+        assert overview_path.exists()
+
     def test_skips_mosaic_when_not_configured(self, validated_config):
         assert validated_config.paths.field_mosaic is None
         postprocess.run(validated_config)
         assert not (validated_config.paths.postprocess_dir / "true" / "mosaic_true.fits").exists()
 
-    def test_does_not_build_mosaics_for_non_true_classes(self, validated_config):
+    def test_does_not_build_mosaics_for_non_true_classes(self, validated_config, monkeypatch):
+        monkeypatch.setattr(
+            "hivalidate.cutouts.optical.SkyView.get_images", _stub_skyview_get_images
+        )
         field_wcs = WCS(naxis=2)
         field_wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
         field_wcs.wcs.crval = [315.0, -55.0]
@@ -157,6 +185,9 @@ class TestPostprocessCli:
         for class_name in ("false", "uncertain", "duplicate"):
             assert not list(
                 (validated_config.paths.postprocess_dir / class_name).glob("mosaic_*.fits")
+            )
+            assert not list(
+                (validated_config.paths.postprocess_dir / class_name).glob("mosaic_*.png")
             )
 
     def test_fails_clearly_if_qa_was_not_run(self, tmp_path):

@@ -164,6 +164,18 @@ def _synthetic_cutout(tmp_path, name, ra, dec, value, size=10):
     return path
 
 
+class TestFieldCenterAndFov:
+    def test_returns_the_fields_own_real_center_and_angular_size(self, field_mosaic_file):
+        center, fov_arcsec = postprocess.field_center_and_fov(field_mosaic_file)
+        # A few pixels' worth of tolerance -- (nx/2, ny/2) is close to but not
+        # exactly the array's true center (at nx/2 - 0.5 in 0-based coordinates),
+        # a difference that's negligible at any real field's actual scale.
+        assert center.ra.deg == pytest.approx(10.0, abs=5e-3)
+        assert center.dec.deg == pytest.approx(-30.0, abs=5e-3)
+        # 100x100 pixels at 0.001 deg/pixel.
+        assert fov_arcsec == pytest.approx(100 * 0.001 * 3600, rel=0.01)
+
+
 class TestBuildMosaic:
     def test_output_matches_field_mosaic_shape_and_wcs(self, tmp_path, field_mosaic_file):
         cutout = _synthetic_cutout(tmp_path, "src1", ra=10.0, dec=-30.0, value=5.0)

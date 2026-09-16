@@ -598,3 +598,61 @@ def _provenance_backend(provenance: str) -> str:
     this is purely to stop a long filename from overlapping the adjacent panel.
     """
     return provenance.split(":", 1)[0]
+
+
+#: Contour levels for build_true_detections_overview_figure, as multiples of the
+#: coadded mosaic's own sigma-clipped background noise above its median -- not the
+#: per-source dry-run contours' physical column-density conversion
+#: (conversions.column_density), which needs one redshift/cosmology per source and
+#: so has no single meaning across a mosaic coadding detections at many different,
+#: unrelated redshifts.
+_OVERVIEW_CONTOUR_SIGMA_LEVELS = [3, 6, 12, 24]
+
+
+def build_true_detections_overview_figure(
+    optical: CutoutResult, mosaic_data: np.ndarray, mosaic_wcs: WCS, field_name: str
+) -> Figure:
+    """Whole-field overview: an optical background image with the true-flagged
+    detections' coadded moment-0 mosaic (`postprocess.build_mosaic`) overlaid as
+    contours, so the overall spatial distribution of real detections across the
+    whole field can be seen at a glance -- direct user request.
+
+    `optical` should come from `cutouts.optical.SkyViewBackend` specifically, not
+    the per-source `optical_priority` chain: a field mosaic can span several
+    degrees (confirmed against real data: SB82605's is ~6x6 deg), and SkyView
+    returns a fixed-size image regardless of how large a field of view is
+    requested, unlike `LegacySurveyBackend` (which would try to request an
+    enormous native-resolution image and isn't guaranteed to even cover a field
+    this wide, since DECam-based surveys have their own declination limits).
+
+    Contour levels are `_OVERVIEW_CONTOUR_SIGMA_LEVELS` multiples of `mosaic_data`'s
+    own sigma-clipped background noise above its median, computed only from its
+    nonzero pixels -- `build_mosaic` fills every pixel a true-flagged cubelet
+    doesn't reproject onto with exactly 0, and those would otherwise swamp any
+    background statistic computed over the whole (mostly empty) mosaic.
+    """
+    fig = Figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection=optical.wcs)
+    ax.imshow(
+        optical.data,
+        origin="lower",
+        interpolation="nearest",
+        cmap="Greys",
+        norm=_background_anchored_norm(optical.data),
+    )
+
+    finite = mosaic_data[mosaic_data != 0]
+    if finite.size > 0:
+        _, median, sigma = sigma_clipped_stats(finite, sigma=3.0, maxiters=5)
+        if np.isfinite(sigma) and sigma > 0:
+            levels = [median + n * sigma for n in _OVERVIEW_CONTOUR_SIGMA_LEVELS]
+            ax.contour(
+                mosaic_data, levels=levels, transform=ax.get_transform(mosaic_wcs), colors="C1"
+            )
+
+    _format_sky_axes(ax, ylabel=True)
+    ax.set_title(
+        f"{field_name}: true detections overview ({_provenance_backend(optical.provenance)})",
+        size=14,
+    )
+    return fig

@@ -157,10 +157,24 @@ class LegacySurveyBackend(CutoutBackend):
         layer: str = "ls-dr10",
         pixscale_arcsec: float = 0.262,
         max_retries: int = 5,
+        timeout_s: float = 30.0,
     ):
         self.layer = layer
         self.pixscale_arcsec = pixscale_arcsec
         self.max_retries = max_retries
+        # A per-source cutout (the default use) is small and fast, so 30s is a
+        # generous default. A field-wide cutout is a different regime entirely --
+        # confirmed live: two ~6x6 deg fields at the same 2000x2000 target size took
+        # 23s and 138s respectively, i.e. this service's response time is load- or
+        # field-dependent, not just a function of the requested size. A caller
+        # building a field-wide cutout should pass a much larger `timeout_s`.
+        self.timeout_s = timeout_s
+
+    def cache_key(self) -> str:
+        # pixscale_arcsec changes what's actually fetched (a field-wide overview
+        # instance uses a far coarser scale than a per-source one) -- see
+        # CutoutBackend.cache_key's docstring for why this must be part of the key.
+        return f"{self.name}__{self.pixscale_arcsec:.4f}"
 
     def check_coverage(self, position: SkyCoord) -> bool:
         return position.dec.deg < self.APPROX_DEC_CEILING_DEG
@@ -176,7 +190,7 @@ class LegacySurveyBackend(CutoutBackend):
 
         def _get():
             try:
-                response = requests.get(url, timeout=30)
+                response = requests.get(url, timeout=self.timeout_s)
             except requests.exceptions.RequestException as exc:
                 raise CutoutUnavailable(f"Legacy Survey request failed: {exc}") from exc
             # 503 (observed live during development -- the service was briefly down)

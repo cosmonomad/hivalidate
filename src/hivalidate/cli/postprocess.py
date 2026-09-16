@@ -39,10 +39,17 @@ logger = logging.getLogger(__name__)
 #: fetch a field several degrees across at native resolution -- tens of thousands of
 #: pixels a side, confirmed live to just time out. A pixel scale computed from the
 #: field's own real FOV against this target keeps the request a size the service
-#: actually answers (confirmed live: a real ~6x6 deg field at this target completed
-#: in ~10s and returned full pixel coverage) while still far sharper than SkyView's
-#: fixed 300x300 output.
-_FIELD_OVERVIEW_TARGET_PIXELS = 1200
+#: actually answers while still far sharper than SkyView's fixed 300x300 output.
+#: 2000 (not higher): confirmed live that response time at this target is not a
+#: simple function of pixel count -- two different ~6x6 deg fields at this same
+#: target took 23s and 138s respectively (server load/caching, not request size),
+#: so `_FIELD_OVERVIEW_TIMEOUT_S` below matters at least as much as this number.
+_FIELD_OVERVIEW_TARGET_PIXELS = 2000
+
+#: Generous enough for the slower of the two real timings above (138s) with margin;
+#: LegacySurveyBackend's per-source default (30s) is far too tight for a field-sized
+#: request and would abort a legitimately-still-working fetch as a failure.
+_FIELD_OVERVIEW_TIMEOUT_S = 180.0
 
 
 def run(config: Config) -> None:
@@ -137,11 +144,20 @@ def run(config: Config) -> None:
         # scale; SkyView as fallback for coverage Legacy Survey doesn't have (e.g.
         # far-northern fields, past its DECam-based layers' declination ceiling).
         legacy_pixscale = fov_arcsec / _FIELD_OVERVIEW_TARGET_PIXELS
+        legacy_backend = LegacySurveyBackend(
+            pixscale_arcsec=legacy_pixscale,
+            timeout_s=_FIELD_OVERVIEW_TIMEOUT_S,
+            # Capped well below the default 5: at this timeout, several retries
+            # could keep postprocess waiting on a single slow field for the better
+            # part of half an hour in the worst case: still enough to ride out one
+            # bad response without that.
+            max_retries=2,
+        )
         optical = fetch_with_fallback(
             center,
             fov_arcsec,
             config.field_name,
-            [LegacySurveyBackend(pixscale_arcsec=legacy_pixscale), SkyViewBackend()],
+            [legacy_backend, SkyViewBackend()],
             cache=cache,
         )
     except CutoutUnavailable as exc:

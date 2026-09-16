@@ -30,13 +30,26 @@ def _fake_wcs() -> WCS:
 
 
 class FakeBackend(CutoutBackend):
-    def __init__(self, name, *, covers=True, fetch_result=None, fetch_error=None, calls=None):
+    def __init__(
+        self,
+        name,
+        *,
+        covers=True,
+        fetch_result=None,
+        fetch_error=None,
+        calls=None,
+        cache_key=None,
+    ):
         self.name = name
         self._covers = covers
         self._fetch_result = fetch_result
         self._fetch_error = fetch_error
+        self._cache_key = cache_key
         self.fetch_call_count = 0
         self.coverage_call_count = 0
+
+    def cache_key(self):
+        return self._cache_key if self._cache_key is not None else super().cache_key()
 
     def check_coverage(self, position):
         self.coverage_call_count += 1
@@ -54,6 +67,12 @@ class FakeBackend(CutoutBackend):
 
 def _result(provenance="fake:test"):
     return CutoutResult(data=np.ones((5, 5)), wcs=_fake_wcs(), provenance=provenance)
+
+
+class TestCutoutBackendCacheKey:
+    def test_default_cache_key_is_just_name(self):
+        backend = FakeBackend("plain")
+        assert backend.cache_key() == "plain"
 
 
 class TestCutoutCache:
@@ -121,6 +140,29 @@ class TestFetchWithFallback:
         good = FakeBackend("good", fetch_result=_result("good:live"))
         fetch_with_fallback(POSITION, 30.0, "src", [good], cache=cache)
         assert cache.get("src", "good", 30.0).provenance == "good:live"
+
+    def test_a_backends_own_cache_key_not_just_name_is_used(self, tmp_path):
+        # A backend whose fetch behaviour depends on more than just name/position/
+        # size (e.g. LegacySurveyBackend's configurable pixel scale) must not share
+        # a cache entry with a differently-configured instance of the same backend
+        # -- found live: cli.postprocess's field-wide fetch (a coarse pixel scale)
+        # kept silently returning an earlier run's cached fine-scale image, since
+        # both used the same cache key ("legacy_survey").
+        cache = CutoutCache(tmp_path)
+        coarse = FakeBackend(
+            "legacy_survey", cache_key="legacy_survey__coarse", fetch_result=_result("coarse")
+        )
+        fine = FakeBackend(
+            "legacy_survey", cache_key="legacy_survey__fine", fetch_result=_result("fine")
+        )
+        fetch_with_fallback(POSITION, 30.0, "src", [coarse], cache=cache)
+
+        # Same name, same source/size, *different* cache_key() -> the fine backend
+        # must still actually fetch, not silently reuse the coarse backend's cache
+        # entry.
+        result = fetch_with_fallback(POSITION, 30.0, "src", [fine], cache=cache)
+        assert result.provenance == "fine"
+        assert fine.fetch_call_count == 1
 
 
 class TestRetryWithBackoff:

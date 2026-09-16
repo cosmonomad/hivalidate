@@ -626,10 +626,13 @@ def build_true_detections_overview_figure(
     rather than the per-source chain's fine native-resolution default -- at the
     per-source scale a field this wide would mean an unusably large request
     (confirmed live: it just times out); a field-appropriate scale (confirmed live:
-    ~1200x1200 px, completing in ~10s with full pixel coverage) does not. SkyView is
-    the fallback for coverage Legacy Survey's DECam-based layers don't have (e.g.
-    far-northern fields, past their declination ceiling), returning a fixed-size
-    image regardless of the requested field of view.
+    ~2000x2000 px, completing with full pixel coverage -- but with response time
+    ranging from ~20s to ~140s for two different real fields at the same target
+    size, so `cli.postprocess` uses a generous, non-default request timeout for
+    this fetch specifically) does not. SkyView is the fallback for coverage Legacy
+    Survey's DECam-based layers don't have (e.g. far-northern fields, past their
+    declination ceiling), returning a fixed-size image regardless of the requested
+    field of view.
 
     Contour levels are `_OVERVIEW_CONTOUR_SIGMA_LEVELS` multiples of `mosaic_data`'s
     own sigma-clipped background noise above its median, computed only from its

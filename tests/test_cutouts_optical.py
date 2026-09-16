@@ -110,6 +110,32 @@ class TestLegacySurveyBackendMocked:
         assert not backend.check_coverage(far_north)
         assert backend.check_coverage(POSITION)
 
+    def test_cache_key_differs_by_pixel_scale(self):
+        # Two instances with different pixscale_arcsec (e.g. cli.postprocess's
+        # field-wide instance vs. the per-source default) must not collide on one
+        # cache entry -- see CutoutBackend.cache_key's docstring.
+        coarse = LegacySurveyBackend(pixscale_arcsec=20.0)
+        fine = LegacySurveyBackend(pixscale_arcsec=0.262)
+        assert coarse.cache_key() != fine.cache_key()
+
+    def test_uses_the_configured_timeout_not_the_default(self, monkeypatch):
+        # A field-wide cutout (cli.postprocess) needs a far longer timeout than a
+        # per-source one -- confirmed live, two different ~6x6 deg fields at the
+        # same pixel target took 23s and 138s respectively. Must be configurable,
+        # not hardcoded.
+        captured = {}
+
+        def fake_get(url, timeout):
+            captured["timeout"] = timeout
+            buf = io.BytesIO()
+            fits.writeto(buf, _fake_grz_cube(), overwrite=True)
+            return _FakeResponse(200, buf.getvalue())
+
+        monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
+        backend = LegacySurveyBackend(timeout_s=180.0)
+        backend.fetch(POSITION, size_arcsec=26.2)
+        assert captured["timeout"] == 180.0
+
     def test_builds_expected_cutout_url(self, monkeypatch):
         captured = {}
 

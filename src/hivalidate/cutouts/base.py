@@ -49,6 +49,22 @@ class CutoutBackend(ABC):
 
     name: str
 
+    def cache_key(self) -> str:
+        """Discriminates `CutoutCache` entries beyond `name` alone, for a backend
+        whose fetch behaviour varies by more than just position/size -- e.g.
+        `LegacySurveyBackend`'s configurable pixel scale. Without this, two
+        differently-configured instances of the same backend (same `name`, same
+        `source_name`/`size_arcsec`) would collide on one cache entry, and whichever
+        fetched first would keep silently serving stale, wrong-resolution data to
+        the other forever after (found live: `cli.postprocess`'s field-wide Legacy
+        Survey fetch, at a much coarser pixel scale than any per-source fetch,
+        landed on the same cache key as an earlier run's field-wide fetch at a
+        different scale and kept returning that old, lower-resolution image).
+        Default: just `name`, unchanged behaviour for a backend with no such
+        per-instance setting (e.g. `SkyViewBackend`).
+        """
+        return self.name
+
     def check_coverage(self, position: SkyCoord) -> bool:
         """Cheap, no-network pre-check of whether this backend could plausibly cover
         `position`, to skip a network round-trip when we already know the answer is
@@ -119,7 +135,7 @@ def fetch_with_fallback(
     failures: list[str] = []
     for backend in backends:
         if cache is not None:
-            cached = cache.get(source_name, backend.name, size_arcsec)
+            cached = cache.get(source_name, backend.cache_key(), size_arcsec)
             if cached is not None:
                 logger.debug("%s: cache hit for %s", backend.name, source_name)
                 return cached
@@ -136,7 +152,7 @@ def fetch_with_fallback(
             continue
 
         if cache is not None:
-            cache.put(source_name, backend.name, size_arcsec, result)
+            cache.put(source_name, backend.cache_key(), size_arcsec, result)
         return result
 
     raise CutoutUnavailable(

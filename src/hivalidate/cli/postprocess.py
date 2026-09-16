@@ -29,9 +29,19 @@ from hivalidate.cutouts.base import (  # noqa: E402
     CutoutUnavailable,
     fetch_with_fallback,
 )
-from hivalidate.cutouts.optical import SkyViewBackend  # noqa: E402
+from hivalidate.cutouts.optical import LegacySurveyBackend, SkyViewBackend  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
+#: Target size (pixels, per side) for the field-wide Legacy Survey cutout.
+#: LegacySurveyBackend's per-source default pixel scale (0.262"/pix) would try to
+#: fetch a field several degrees across at native resolution -- tens of thousands of
+#: pixels a side, confirmed live to just time out. A pixel scale computed from the
+#: field's own real FOV against this target keeps the request a size the service
+#: actually answers (confirmed live: a real ~6x6 deg field at this target completed
+#: in ~10s and returned full pixel coverage) while still far sharper than SkyView's
+#: fixed 300x300 output.
+_FIELD_OVERVIEW_TARGET_PIXELS = 1200
 
 
 def run(config: Config) -> None:
@@ -94,11 +104,20 @@ def run(config: Config) -> None:
     center, fov_arcsec = postprocess.field_center_and_fov(config.paths.field_mosaic)
     cache = CutoutCache(config.cutouts.cache_dir) if config.cutouts.cache_dir else None
     try:
-        # SkyViewBackend specifically, not config.cutouts.optical_priority's
-        # per-source chain -- see build_true_detections_overview_figure's docstring
-        # for why the per-source-oriented LegacySurveyBackend isn't a fit here.
+        # Not config.cutouts.optical_priority's per-source chain -- that chain's
+        # LegacySurveyBackend is built with the per-source pixel scale, which is far
+        # too fine for a field spanning several degrees. Legacy Survey first
+        # (matching the per-source preference for its real grz composite imaging
+        # over SkyView's greyscale DSS2 Red), with its own field-appropriate pixel
+        # scale; SkyView as fallback for coverage Legacy Survey doesn't have (e.g.
+        # far-northern fields, past its DECam-based layers' declination ceiling).
+        legacy_pixscale = fov_arcsec / _FIELD_OVERVIEW_TARGET_PIXELS
         optical = fetch_with_fallback(
-            center, fov_arcsec, config.field_name, [SkyViewBackend()], cache=cache
+            center,
+            fov_arcsec,
+            config.field_name,
+            [LegacySurveyBackend(pixscale_arcsec=legacy_pixscale), SkyViewBackend()],
+            cache=cache,
         )
     except CutoutUnavailable as exc:
         logger.warning("Could not fetch a field-wide optical background, skipping: %s", exc)

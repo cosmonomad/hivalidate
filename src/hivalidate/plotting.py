@@ -617,13 +617,19 @@ def build_true_detections_overview_figure(
     contours, so the overall spatial distribution of real detections across the
     whole field can be seen at a glance -- direct user request.
 
-    `optical` should come from `cutouts.optical.SkyViewBackend` specifically, not
-    the per-source `optical_priority` chain: a field mosaic can span several
-    degrees (confirmed against real data: SB82605's is ~6x6 deg), and SkyView
-    returns a fixed-size image regardless of how large a field of view is
-    requested, unlike `LegacySurveyBackend` (which would try to request an
-    enormous native-resolution image and isn't guaranteed to even cover a field
-    this wide, since DECam-based surveys have their own declination limits).
+    `optical` should be fetched for the whole field's own real footprint, not through
+    the per-source `optical_priority` chain: a field mosaic can span several degrees
+    (confirmed against real data: SB82605's and NGC4808's are both ~6x6 deg), far
+    wider than any per-source cutout. `cli.postprocess` fetches this with Legacy
+    Survey first (its grz composite over SkyView's greyscale DSS2 Red, matching the
+    per-source preference), using a pixel scale computed from the field's own FOV
+    rather than the per-source chain's fine native-resolution default -- at the
+    per-source scale a field this wide would mean an unusably large request
+    (confirmed live: it just times out); a field-appropriate scale (confirmed live:
+    ~1200x1200 px, completing in ~10s with full pixel coverage) does not. SkyView is
+    the fallback for coverage Legacy Survey's DECam-based layers don't have (e.g.
+    far-northern fields, past their declination ceiling), returning a fixed-size
+    image regardless of the requested field of view.
 
     Contour levels are `_OVERVIEW_CONTOUR_SIGMA_LEVELS` multiples of `mosaic_data`'s
     own sigma-clipped background noise above its median, computed only from its

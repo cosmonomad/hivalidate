@@ -3,6 +3,7 @@ via combine -> dedup -> rename -> dry-run -> qa (stubbed cutouts, scripted QA
 responses, no network, no real display) against the fixture.
 """
 
+import io
 from pathlib import Path
 
 import numpy as np
@@ -56,6 +57,28 @@ def _stub_skyview_get_images(**kwargs):
         header = wcs.to_header()
 
     return [[_FakeHDU()]]
+
+
+class _FakeResponse:
+    def __init__(self, status_code, content):
+        self.status_code = status_code
+        self.content = content
+
+
+def _stub_legacy_survey_get(url, timeout):
+    """Stands in for `hivalidate.cutouts.optical.requests.get` -- the field overview
+    step tries Legacy Survey first (`cli.postprocess._FIELD_OVERVIEW_TARGET_PIXELS`),
+    which would otherwise make these "no network" CLI tests hit the real service.
+    """
+    wcs = WCS(naxis=2)
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    wcs.wcs.crval = [315.0, -55.0]
+    wcs.wcs.crpix = [25, 25]
+    wcs.wcs.cdelt = [-20.0 / 3600, 20.0 / 3600]
+    cube = np.ones((3, 50, 50))
+    buf = io.BytesIO()
+    fits.writeto(buf, cube, wcs.to_header(), overwrite=True)
+    return _FakeResponse(200, buf.getvalue())
 
 
 @pytest.fixture
@@ -141,6 +164,7 @@ class TestPostprocessCli:
     def test_builds_mosaic_when_field_mosaic_configured(self, validated_config, monkeypatch):
         # config_mini.yaml has no field_mosaic -- point it at a tiny synthetic one to
         # exercise the mosaic branch end-to-end through the real CLI.
+        monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", _stub_legacy_survey_get)
         monkeypatch.setattr(
             "hivalidate.cutouts.optical.SkyView.get_images", _stub_skyview_get_images
         )
@@ -166,7 +190,7 @@ class TestPostprocessCli:
             validated_config.paths.postprocess_dir / "true" / "mosaic_true_optical.fits"
         )
         assert optical_fits_path.exists()
-        assert fits.getdata(optical_fits_path).shape == (300, 300)  # _stub_skyview_get_images
+        assert fits.getdata(optical_fits_path).shape == (50, 50)  # _stub_legacy_survey_get
 
     def test_skips_mosaic_when_not_configured(self, validated_config):
         assert validated_config.paths.field_mosaic is None
@@ -174,6 +198,7 @@ class TestPostprocessCli:
         assert not (validated_config.paths.postprocess_dir / "true" / "mosaic_true.fits").exists()
 
     def test_does_not_build_mosaics_for_non_true_classes(self, validated_config, monkeypatch):
+        monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", _stub_legacy_survey_get)
         monkeypatch.setattr(
             "hivalidate.cutouts.optical.SkyView.get_images", _stub_skyview_get_images
         )

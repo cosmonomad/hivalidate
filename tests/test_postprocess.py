@@ -40,21 +40,30 @@ def _fake_validated_table():
                 "SoFiA J000002.00-300000.0",
             ],
             "ra": [0.0, 0.001, 0.002],
-            "qa": [1.0, 0.0, float("nan")],
             # add_derived_physical_columns' inputs -- SoFiA's native frequency-domain
-            # units, matching real catalogue column names.
+            # units, matching real catalogue column names. freq_peak stands in for
+            # "the last of SoFiA's own catalogue columns" in the real catalogue.
             "freq": [1.40e9, 1.35e9, 1.30e9],
             "w20": [2.0e5, 1.8e5, 1.6e5],
             "w50": [1.5e5, 1.3e5, 1.1e5],
             "wm50": [1.4e5, 1.2e5, 1.0e5],
             "f_sum": [10.0, 5.0, 2.0],
             "err_f_sum": [0.5, 0.3, 0.1],
+            "freq_peak": [1.40e9, 1.35e9, 1.30e9],
             # write_validation_csv's _CSV_DROPPED_COLUMNS -- present here so those
             # tests exercise the real drop, not just the absence of an error.
             "source_run": ["run1", "run1", "run2"],
             "external_ra": [0.0, 0.001, 0.002],
             "external_dec": [-30.0, -30.0, -30.0],
             "external_z": [0.01, 0.02, 0.03],
+            # _EXTERNAL_COLUMN_ORDER's surviving (kept, reordered) columns.
+            "external_catalogue_name": ["DESI", "DESI", ""],
+            "external_id": ["1", "2", ""],
+            "external_sep_arcsec": [1.0, 2.0, np.nan],
+            "external_vel_diff_km_s": [5.0, 6.0, np.nan],
+            # qa/qa_comment must end up last regardless of where they start.
+            "qa": [1.0, 0.0, float("nan")],
+            "qa_comment": ["", "", ""],
         }
     )
 
@@ -126,10 +135,51 @@ class TestWriteValidationCsv:
         # No crossmatch configured -> the table has no external_* columns at all;
         # the drop step must tolerate columns that were never there.
         table = _fake_validated_table()[:1]
-        table.remove_columns(["external_ra", "external_dec", "external_z"])
+        table.remove_columns(
+            [
+                "external_ra",
+                "external_dec",
+                "external_z",
+                "external_catalogue_name",
+                "external_id",
+                "external_sep_arcsec",
+                "external_vel_diff_km_s",
+            ]
+        )
         out = tmp_path / "out.csv"
         postprocess.write_validation_csv(table, out)  # must not raise
         assert out.exists()
+
+    def test_column_order_is_sofia_then_derived_then_external_then_qa(self, tmp_path):
+        table = _fake_validated_table()[:1]
+        out = tmp_path / "out.csv"
+        postprocess.write_validation_csv(table, out)
+        with open(out) as fh:
+            header = next(csv.reader(fh))
+
+        assert header.index("freq_peak") < header.index("redshift")
+        assert header.index("log_hi_mass_msun_err") < header.index("external_catalogue_name")
+        assert header.index("external_vel_diff_km_s") < header.index("qa")
+        assert header[-2:] == ["qa", "qa_comment"]
+
+    def test_derived_and_external_columns_are_in_their_documented_order(self, tmp_path):
+        table = _fake_validated_table()[:1]
+        out = tmp_path / "out.csv"
+        postprocess.write_validation_csv(table, out)
+        with open(out) as fh:
+            header = next(csv.reader(fh))
+
+        derived_present = [c for c in postprocess._DERIVED_PHYSICAL_COLUMN_ORDER if c in header]
+        assert derived_present == postprocess._DERIVED_PHYSICAL_COLUMN_ORDER
+        assert [header[i] for i in sorted(header.index(c) for c in derived_present)] == (
+            derived_present
+        )
+
+        external_present = [c for c in postprocess._EXTERNAL_COLUMN_ORDER if c in header]
+        assert external_present == postprocess._EXTERNAL_COLUMN_ORDER
+        assert [header[i] for i in sorted(header.index(c) for c in external_present)] == (
+            external_present
+        )
 
 
 class TestAddDerivedPhysicalColumns:

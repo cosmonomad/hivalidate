@@ -74,6 +74,27 @@ def filter_by_qa(validated_catalogue: Table, qa_values: set[float]) -> Table:
 #: (e.g. no crossmatch was configured, so the external_* columns don't exist).
 _CSV_DROPPED_COLUMNS = ["source_run", "external_z", "external_ra", "external_dec"]
 
+#: Display order for the CSV's non-SoFiA columns, applied by `_reorder_csv_columns`
+#: -- direct user request: derived physical parameters (redshift/velocity/linewidths/
+#: HI mass) right after SoFiA's own catalogue columns end (at `freq_peak`), then the
+#: surviving external-catalogue crossmatch columns, then qa/qa_comment last.
+_DERIVED_PHYSICAL_COLUMN_ORDER = [
+    "redshift",
+    "velocity_km_s",
+    "w20_km_s",
+    "w50_km_s",
+    "wm50_km_s",
+    "log_hi_mass_msun",
+    "log_hi_mass_msun_err",
+]
+_EXTERNAL_COLUMN_ORDER = [
+    "external_catalogue_name",
+    "external_id",
+    "external_sep_arcsec",
+    "external_vel_diff_km_s",
+]
+_QA_COLUMN_ORDER = ["qa", "qa_comment"]
+
 
 def add_derived_physical_columns(table: Table) -> Table:
     """Add velocity-domain/redshift/HI-mass columns derived from SoFiA's native
@@ -116,16 +137,41 @@ def add_derived_physical_columns(table: Table) -> Table:
     return table
 
 
+def _reorder_csv_columns(table: Table) -> Table:
+    """Put `_DERIVED_PHYSICAL_COLUMN_ORDER` right after SoFiA's own catalogue columns
+    (whatever is left once the moved/dropped columns are set aside -- these already
+    end at `freq_peak` in every real catalogue this pipeline produces, so nothing
+    needs to name that column specifically), then `_EXTERNAL_COLUMN_ORDER`, then
+    `_QA_COLUMN_ORDER` last. A moved/ordered column not present in `table` (e.g. no
+    crossmatch was configured, so no external_* columns exist) is silently skipped.
+    """
+    moved = {
+        *_DERIVED_PHYSICAL_COLUMN_ORDER,
+        *_EXTERNAL_COLUMN_ORDER,
+        *_QA_COLUMN_ORDER,
+    }
+    sofia_columns = [c for c in table.colnames if c not in moved]
+    ordered = [
+        *sofia_columns,
+        *(c for c in _DERIVED_PHYSICAL_COLUMN_ORDER if c in table.colnames),
+        *(c for c in _EXTERNAL_COLUMN_ORDER if c in table.colnames),
+        *(c for c in _QA_COLUMN_ORDER if c in table.colnames),
+    ]
+    return table[ordered]
+
+
 def write_validation_csv(table: Table, output_path: str | Path) -> None:
     """Adds `add_derived_physical_columns`' velocity/redshift/HI-mass columns, drops
-    `_CSV_DROPPED_COLUMNS`, and writes the result via `hivalidate.catalogue.write_csv`
-    -- kept as its own function since `hivalidate.cli.postprocess` calling
-    `write_validation_csv` reads more clearly at the call site than the generic
-    `write_csv`, and because this is where the postprocess-CSV-specific column
-    transformations belong (the VOTable catalogues stay in SoFiA's native units).
+    `_CSV_DROPPED_COLUMNS`, reorders the result (`_reorder_csv_columns`), and writes
+    it via `hivalidate.catalogue.write_csv` -- kept as its own function since
+    `hivalidate.cli.postprocess` calling `write_validation_csv` reads more clearly at
+    the call site than the generic `write_csv`, and because this is where the
+    postprocess-CSV-specific column transformations belong (the VOTable catalogues
+    stay in SoFiA's native units/order).
     """
     table = add_derived_physical_columns(table)
     table.remove_columns([c for c in _CSV_DROPPED_COLUMNS if c in table.colnames])
+    table = _reorder_csv_columns(table)
     catalogue.write_csv(table, output_path)
 
 

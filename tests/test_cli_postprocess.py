@@ -162,6 +162,12 @@ class TestPostprocessCli:
         overview_path = validated_config.paths.postprocess_dir / "true" / "mosaic_true_optical.png"
         assert overview_path.exists()
 
+        optical_fits_path = (
+            validated_config.paths.postprocess_dir / "true" / "mosaic_true_optical.fits"
+        )
+        assert optical_fits_path.exists()
+        assert fits.getdata(optical_fits_path).shape == (300, 300)  # _stub_skyview_get_images
+
     def test_skips_mosaic_when_not_configured(self, validated_config):
         assert validated_config.paths.field_mosaic is None
         postprocess.run(validated_config)

@@ -640,6 +640,15 @@ def build_true_detections_overview_figure(
         cmap="Greys",
         norm=_background_anchored_norm(optical.data),
     )
+    # Pin the view to the optical image's own pixel extent *before* adding the
+    # contour -- otherwise WCSAxes autoscales to include the contour's full
+    # transformed footprint (the mosaic_wcs, a different projection/pixel grid
+    # covering several degrees), which can blow the visible area out to a huge
+    # chunk of sky with the actual cutout shrunk into one corner (found live: this
+    # is exactly what happened before this fix).
+    ny, nx = optical.data.shape
+    ax.set_xlim(-0.5, nx - 0.5)
+    ax.set_ylim(-0.5, ny - 0.5)
 
     finite = mosaic_data[mosaic_data != 0]
     if finite.size > 0:

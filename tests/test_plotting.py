@@ -511,3 +511,21 @@ class TestBuildTrueDetectionsOverviewFigure:
         mosaic_data, mosaic_wcs = self._mosaic(data)
         fig = build_true_detections_overview_figure(optical, mosaic_data, mosaic_wcs, "SB82605")
         assert len(fig.axes[0].collections) >= 1  # the contour
+
+    def test_view_stays_pinned_to_the_optical_cutout_not_the_contours_full_extent(self):
+        # Found live against real data: WCSAxes autoscales to include everything it's
+        # been shown, including a contour plotted via a *different* WCS transform
+        # (mosaic_wcs, a whole field spanning several degrees) -- without explicitly
+        # pinning the view back to the optical image's own pixel extent, the axes
+        # zoomed out to a huge, mostly-empty patch of sky with the actual cutout
+        # shrunk into one corner.
+        optical = _fake_cutout(size=100, arcsec_per_pix=6.0)
+        rng = np.random.default_rng(0)
+        data = rng.normal(0, 1, size=(50, 50))
+        data[20:25, 20:25] += 50
+        mosaic_data, mosaic_wcs = self._mosaic(data)
+        fig = build_true_detections_overview_figure(optical, mosaic_data, mosaic_wcs, "SB82605")
+        ax = fig.axes[0]
+        xlim, ylim = ax.get_xlim(), ax.get_ylim()
+        assert xlim == pytest.approx((-0.5, 99.5))
+        assert ylim == pytest.approx((-0.5, 99.5))

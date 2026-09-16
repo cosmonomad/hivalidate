@@ -1,7 +1,7 @@
 """Build post-validation artifacts (CSV, cubelets, dry-run plots, and -- true only --
-a mosaic FITS plus an optical-background overview PNG) for every reviewed QA class
-(true/false/uncertain/duplicate), each under its own `postprocess/<class_name>/`
-subdirectory.
+a mosaic FITS, the field-wide optical background as its own FITS, and an
+optical-background overview PNG) for every reviewed QA class (true/false/uncertain/
+duplicate), each under its own `postprocess/<class_name>/` subdirectory.
 
 Run `hivalidate-qa` first (or at least far enough into a session that some sources
 have been reviewed -- this can be run against a partially-reviewed catalogue; classes
@@ -105,6 +105,15 @@ def run(config: Config) -> None:
         optical = None
 
     if optical is not None:
+        # The raw optical cutout as its own FITS, alongside mosaic_true.fits -- so it
+        # can be loaded and inspected directly (e.g. in DS9, or overlaid with other
+        # data) rather than only ever seen baked into the PNG.
+        optical_fits_path = config.paths.postprocess_dir / "true" / "mosaic_true_optical.fits"
+        optical_header = optical.wcs.to_header()
+        optical_header["HIVPROV"] = optical.provenance
+        fits.writeto(optical_fits_path, optical.data, optical_header, overwrite=True)
+        logger.info("Wrote %s", optical_fits_path)
+
         mosaic_wcs = WCS(fits.getheader(mosaic_path)).celestial
         fig = plotting.build_true_detections_overview_figure(
             optical, mosaic_data, mosaic_wcs, config.field_name

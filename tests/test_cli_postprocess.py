@@ -183,6 +183,9 @@ class TestPostprocessCli:
         assert mosaic_path.exists()
         assert fits.getdata(mosaic_path).shape == (1000, 1000)
 
+        velocity_png_path = validated_config.paths.postprocess_dir / "true" / "mosaic_true.png"
+        assert velocity_png_path.exists()
+
         overview_path = validated_config.paths.postprocess_dir / "true" / "mosaic_true_optical.png"
         assert overview_path.exists()
 

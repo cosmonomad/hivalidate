@@ -1,7 +1,8 @@
 """Build post-validation artifacts (CSV, cubelets, dry-run plots, and -- true only --
-a mosaic FITS, the field-wide optical background as its own FITS, and an
-optical-background overview PNG) for every reviewed QA class (true/false/uncertain/
-duplicate), each under its own `postprocess/<class_name>/` subdirectory.
+a mosaic FITS, a velocity-colored PNG of that same mosaic, the field-wide optical
+background as its own FITS, and an optical-background overview PNG) for every
+reviewed QA class (true/false/uncertain/duplicate), each under its own
+`postprocess/<class_name>/` subdirectory.
 
 Run `hivalidate-qa` first (or at least far enough into a session that some sources
 have been reviewed -- this can be run against a partially-reviewed catalogue; classes
@@ -53,6 +54,7 @@ def run(config: Config) -> None:
     config.paths.postprocess_dir.mkdir(parents=True, exist_ok=True)
 
     true_cubelets_dir = None
+    true_sources = None
     for class_name, qa_value in postprocess.QA_CLASSES.items():
         sources = postprocess.filter_by_qa(validated, {qa_value})
         logger.info(
@@ -91,6 +93,7 @@ def run(config: Config) -> None:
 
         if class_name == "true":
             true_cubelets_dir = cubelets_dir
+            true_sources = sources
 
     if config.paths.field_mosaic is None:
         logger.info("No paths.field_mosaic configured -- skipping mosaic step")
@@ -100,6 +103,28 @@ def run(config: Config) -> None:
     mosaic_path = config.paths.postprocess_dir / "true" / "mosaic_true.fits"
     mosaic_data = postprocess.build_mosaic(config.paths.field_mosaic, mom0_files, mosaic_path)
     logger.info("Wrote %s from %d moment-0 maps", mosaic_path, len(mom0_files))
+    mosaic_wcs = WCS(fits.getheader(mosaic_path)).celestial
+
+    # Each mom0_files entry is "<name>_mom0.fits" -- match it back to that source's
+    # own velocity via the same name form the true-class CSV/cubelets already use.
+    velocity_by_name = dict(
+        zip(
+            (str(n).replace(" ", "_") for n in true_sources["name"]),
+            postprocess.add_derived_physical_columns(true_sources)["velocity_km_s"],
+            strict=True,
+        )
+    )
+    velocities = [velocity_by_name[f.name.removesuffix("_mom0.fits")] for f in mom0_files]
+    velocity_mosaic = postprocess.build_velocity_mosaic(
+        config.paths.field_mosaic, mom0_files, velocities
+    )
+    velocity_fig = plotting.build_true_detections_velocity_figure(
+        mosaic_wcs, velocity_mosaic, config.field_name
+    )
+    velocity_png_path = config.paths.postprocess_dir / "true" / "mosaic_true.png"
+    velocity_fig.savefig(velocity_png_path, bbox_inches="tight", dpi=100)
+    plt.close(velocity_fig)
+    logger.info("Wrote %s", velocity_png_path)
 
     center, fov_arcsec = postprocess.field_center_and_fov(config.paths.field_mosaic)
     cache = CutoutCache(config.cutouts.cache_dir) if config.cutouts.cache_dir else None
@@ -133,7 +158,6 @@ def run(config: Config) -> None:
         fits.writeto(optical_fits_path, optical.data, optical_header, overwrite=True)
         logger.info("Wrote %s", optical_fits_path)
 
-        mosaic_wcs = WCS(fits.getheader(mosaic_path)).celestial
         fig = plotting.build_true_detections_overview_figure(
             optical, mosaic_data, mosaic_wcs, config.field_name
         )

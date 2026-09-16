@@ -12,9 +12,14 @@
 - A directory of just that class's dry-run validation plots, pulled out of the shared
   flat `dry_run/` directory -- so, e.g., every "uncertain" or "duplicate" source can be
   flicked back through later without hunting through hundreds of unrelated PNGs.
-- A mosaic FITS of the true class's moment-0 maps, reprojected onto the full field --
-  replaces `legacy/mosaic_sofia_true_detections.py`. True-only: "where are the real
-  detections" is the only one of these four classes that question makes sense for.
+- A mosaic FITS of the true class's moment-0 maps, reprojected onto the full field
+  (`mosaic_true.fits`) -- replaces `legacy/mosaic_sofia_true_detections.py`.
+  True-only: "where are the real detections" is the only one of these four classes
+  that question makes sense for. Plus a plain PNG of that same mosaic
+  (`mosaic_true.png`), each detection colored by its own systemic velocity rather
+  than flux, so large-scale velocity structure across the field is visible at a
+  glance (`build_velocity_mosaic`, `hivalidate.plotting.
+  build_true_detections_velocity_figure`) -- direct user request.
 - A PNG of that same mosaic overlaid as contours on an optical background image of
   the whole field, so the overall spatial distribution of real detections can be
   seen against the sky at a glance (`hivalidate.plotting.
@@ -247,6 +252,41 @@ def build_mosaic(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fits.writeto(output_path, data, header, overwrite=True)
+    return data
+
+
+def build_velocity_mosaic(
+    field_mosaic_path: str | Path, mom0_files: list[str | Path], values: list[float]
+) -> np.ndarray:
+    """Like `build_mosaic`, but paints each true detection's own mom0 footprint
+    (reprojected onto the field's own grid) with a single scalar from `values`
+    (aligned index-for-index with `mom0_files`, e.g. that detection's own systemic
+    velocity) instead of coadding flux -- so a field-wide plot can show where
+    detections sit in velocity/redshift space, not just where they sit on the sky
+    (direct user request; companion to `build_mosaic`'s flux mosaic).
+
+    Reprojects each mom0 individually (`reproject_interp`, not
+    `reproject_and_coadd`'s averaging): coadd-averaging two overlapping footprints'
+    *different* velocities the way flux is legitimately summed would produce a
+    physically meaningless blend. Pixels no detection covers are NaN, not 0 -- 0 is
+    itself a valid velocity/redshift and must not read as "no detection here"
+    (`build_mosaic`'s flux mosaic can safely use 0 for that, since 0 flux is not a
+    value worth distinguishing from "no data" there).
+
+    An empty `mom0_files` produces an all-NaN mosaic (matching the field's own
+    shape/WCS) rather than raising -- a field with zero true detections so far is a
+    legitimate, if uninteresting, state to export, not an error.
+    """
+    field_header = fits.getheader(field_mosaic_path)
+    wcs = WCS(field_header).celestial
+    header = wcs.to_header()
+    shape = (field_header["NAXIS2"], field_header["NAXIS1"])
+
+    data = np.full(shape, np.nan)
+    for mom0_file, value in zip(mom0_files, values, strict=True):
+        reprojected, footprint = reproject_interp(str(mom0_file), header, shape_out=shape)
+        detected = (footprint > 0) & np.isfinite(reprojected) & (reprojected != 0)
+        data[detected] = value
     return data
 
 

@@ -25,6 +25,7 @@ from hivalidate.plotting import (
     _EXTERNAL_MATCH_COLORS,
     DISPLAY_FOV_FACTOR,
     build_true_detections_overview_figure,
+    build_true_detections_velocity_figure,
     build_validation_figure,
     load_source_cubelets,
     reference_field_of_view_arcsec,
@@ -529,3 +530,42 @@ class TestBuildTrueDetectionsOverviewFigure:
         xlim, ylim = ax.get_xlim(), ax.get_ylim()
         assert xlim == pytest.approx((-0.5, 99.5))
         assert ylim == pytest.approx((-0.5, 99.5))
+
+
+class TestBuildTrueDetectionsVelocityFigure:
+    """Direct user request: a companion PNG to mosaic_true.fits where each true
+    detection is colored by its own systemic velocity (postprocess.
+    build_velocity_mosaic) rather than flux, to see large-scale velocity structure
+    across the field at a glance.
+    """
+
+    def _wcs(self, size=50):
+        wcs = WCS(naxis=2)
+        wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
+        wcs.wcs.crval = [315.4611, -55.8032]
+        wcs.wcs.crpix = [size / 2, size / 2]
+        wcs.wcs.cdelt = [-6.0 / 3600, 6.0 / 3600]
+        return wcs
+
+    def test_produces_a_single_panel_figure_with_the_field_name_in_the_title(self):
+        wcs = self._wcs()
+        velocity_mosaic = np.full((50, 50), np.nan)
+        velocity_mosaic[20:25, 20:25] = 1000.0
+        fig = build_true_detections_velocity_figure(wcs, velocity_mosaic, "SB82605")
+        assert isinstance(fig, Figure)
+        assert "SB82605" in fig.axes[0].get_title()
+
+    def test_all_nan_mosaic_does_not_raise(self):
+        # build_velocity_mosaic leaves every uncovered pixel NaN -- a field with (so
+        # far) zero true detections is a legitimate state, not an error.
+        wcs = self._wcs()
+        velocity_mosaic = np.full((50, 50), np.nan)
+        fig = build_true_detections_velocity_figure(wcs, velocity_mosaic, "SB82605")
+        assert isinstance(fig, Figure)
+
+    def test_real_data_draws_a_colorbar(self):
+        wcs = self._wcs()
+        velocity_mosaic = np.full((50, 50), np.nan)
+        velocity_mosaic[20:25, 20:25] = 1000.0
+        fig = build_true_detections_velocity_figure(wcs, velocity_mosaic, "SB82605")
+        assert len(fig.axes) == 2  # the main panel plus the colorbar's own axes

@@ -365,3 +365,44 @@ class TestBuildMosaic:
         output = tmp_path / "mosaic.fits"
         data = postprocess.build_mosaic(field_mosaic_file, [cutout], output)
         assert not np.isnan(data).any()
+
+
+class TestBuildVelocityMosaic:
+    def test_paints_each_footprint_with_its_own_value_not_flux(self, tmp_path, field_mosaic_file):
+        # The cutout's own flux (7.5) is irrelevant -- only its footprint (where it's
+        # nonzero) matters; the painted value is the caller-supplied velocity, 900.0.
+        cutout = _synthetic_cutout(tmp_path, "src1", ra=10.0, dec=-30.0, value=7.5)
+        data = postprocess.build_velocity_mosaic(field_mosaic_file, [cutout], [900.0])
+
+        field_wcs = WCS(fits.getheader(field_mosaic_file))
+        x, y = field_wcs.wcs_world2pix(10.0, -30.0, 0)
+        region = data[int(y) - 2 : int(y) + 2, int(x) - 2 : int(x) + 2]
+        assert np.all(region == pytest.approx(900.0))
+
+    def test_uncovered_pixels_are_nan_not_zero(self, tmp_path, field_mosaic_file):
+        # Unlike build_mosaic's flux mosaic, 0 is itself a valid velocity/redshift --
+        # an uncovered pixel must read as NaN, never as a real (if coincidental) 0.
+        cutout = _synthetic_cutout(tmp_path, "src1", ra=10.0, dec=-30.0, value=1.0)
+        data = postprocess.build_velocity_mosaic(field_mosaic_file, [cutout], [0.0])
+        assert np.isnan(data).any()  # most of the field is uncovered by this one cutout
+
+    def test_two_sources_each_keep_their_own_distinct_value(self, tmp_path, field_mosaic_file):
+        cutout1 = _synthetic_cutout(tmp_path, "src1", ra=10.02, dec=-30.02, value=1.0)
+        cutout2 = _synthetic_cutout(tmp_path, "src2", ra=9.98, dec=-29.98, value=1.0)
+        data = postprocess.build_velocity_mosaic(
+            field_mosaic_file, [cutout1, cutout2], [500.0, 1500.0]
+        )
+
+        field_wcs = WCS(fits.getheader(field_mosaic_file))
+        x1, y1 = field_wcs.wcs_world2pix(10.02, -30.02, 0)
+        x2, y2 = field_wcs.wcs_world2pix(9.98, -29.98, 0)
+        assert data[int(y1), int(x1)] == pytest.approx(500.0)
+        assert data[int(y2), int(x2)] == pytest.approx(1500.0)
+
+    def test_empty_mom0_files_produces_all_nan_mosaic_not_an_error(
+        self, tmp_path, field_mosaic_file
+    ):
+        data = postprocess.build_velocity_mosaic(field_mosaic_file, [], [])
+        field_shape = fits.getdata(field_mosaic_file).shape
+        assert data.shape == field_shape
+        assert np.all(np.isnan(data))

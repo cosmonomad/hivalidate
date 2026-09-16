@@ -671,3 +671,30 @@ def build_true_detections_overview_figure(
         size=14,
     )
     return fig
+
+
+def build_true_detections_velocity_figure(
+    mosaic_wcs: WCS, velocity_mosaic: np.ndarray, field_name: str
+) -> Figure:
+    """Field-wide plot of true detections, each one colored by its own systemic
+    velocity (`postprocess.build_velocity_mosaic`) rather than flux -- so large-scale
+    velocity structure across the field (e.g. detections clustering around a
+    particular velocity, a hint of a group or cluster) is visible at a glance, not
+    just spatial distribution -- direct user request; companion PNG to
+    `postprocess.build_mosaic`'s `mosaic_true.fits`.
+
+    `cmap="jet"` matches `build_validation_figure`'s per-source mom1 panel, so the
+    same color consistently means the same velocity across every plot this pipeline
+    produces. No optical background -- `velocity_mosaic`'s uncovered pixels are NaN
+    (`postprocess.build_velocity_mosaic`), which `imshow` leaves transparent, so the
+    field reads as "detections only" against a plain background.
+    """
+    fig = Figure(figsize=(12, 10))
+    ax = fig.add_subplot(111, projection=mosaic_wcs)
+    image = ax.imshow(velocity_mosaic, origin="lower", interpolation="nearest", cmap="jet")
+    if np.isfinite(velocity_mosaic).any():
+        colorbar = fig.colorbar(image, ax=ax, orientation="vertical", pad=0.01, aspect=30)
+        colorbar.ax.set_ylabel(r"Velocity (km s$^{-1}$)")
+    _format_sky_axes(ax, ylabel=True)
+    ax.set_title(f"{field_name}: true detections by velocity", size=14)
+    return fig

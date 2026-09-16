@@ -116,12 +116,15 @@ Set `paths.external_redshift_catalogue` to cross-match every surviving detection
 against an external spectroscopic redshift catalogue (DESI, GAMA, or similar) by
 position + velocity -- `hivalidate-dedup` runs it automatically right after
 deduplication when this is set, adding `external_z`/`external_ra`/`external_dec`/
-`external_sep_arcsec`/`external_vel_diff_km_s`/`external_catalogue_name` columns to
-the deduped catalogue (NaN/empty where nothing matched within tolerance). Skipped
+`external_sep_arcsec`/`external_vel_diff_km_s`/`external_id`/`external_catalogue_name`
+columns to the deduped catalogue (one match can have more than one counterpart, so
+these are per-row arrays, empty where nothing matched within tolerance). Skipped
 entirely if left unset. `paths.external_redshift_catalogue_name` (e.g. `"DESI"`,
 `"GAMA"`, default `"External"`) labels the match marker/line
 `build_validation_figure` overlays on the optical panel and spectrum for any
-cross-matched source.
+cross-matched source; `paths.external_redshift_catalogue_id_column` (e.g. DESI's
+`"target_id"`, GAMA's `"CATAID"`) additionally shows each match's own catalogue ID
+in that label if set.
 
 The catalogue file's format is auto-detected (VOTable XML, FITS, CSV, ...) via
 astropy's unified I/O -- verified against a real DESI VOTable-XML TAP query result

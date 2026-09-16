@@ -76,10 +76,16 @@ class Paths:
     external_redshift_catalogue: Path | None = None
     #: Name of the survey external_redshift_catalogue comes from (e.g. "DESI",
     #: "GAMA") -- used only to label the cross-match marker/line on the validation
-    #: figure (plotting._external_match), not inferred from the file name/path,
+    #: figure (plotting._external_matches), not inferred from the file name/path,
     #: since that's not a reliable source of truth. Defaults to a generic label if
     #: left unset.
     external_redshift_catalogue_name: str = "External"
+    #: Column in external_redshift_catalogue holding each row's own catalogue ID
+    #: (e.g. DESI's "target_id", GAMA's "CATAID") -- shown alongside the redshift on
+    #: the cross-match marker/line label if set. Optional (unlike ra/dec/z columns,
+    #: an ID isn't needed for the match itself, only for display) -- no ID shown if
+    #: left unset.
+    external_redshift_catalogue_id_column: str | None = None
     #: Full-field moment-0 mosaic (SoFiA's own output, e.g. `run_sofia/mom0.fits`),
     #: used only by Phase 5 postprocess to place true-flagged detections in context.
     #: Optional -- the mosaic step is skipped (not an error) if unset.
@@ -153,6 +159,9 @@ class Config:
                 external_redshift_catalogue=resolve(raw_paths.get("external_redshift_catalogue")),
                 external_redshift_catalogue_name=raw_paths.get(
                     "external_redshift_catalogue_name", "External"
+                ),
+                external_redshift_catalogue_id_column=raw_paths.get(
+                    "external_redshift_catalogue_id_column"
                 ),
                 field_mosaic=resolve(raw_paths.get("field_mosaic")),
             )

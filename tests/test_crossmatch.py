@@ -89,6 +89,26 @@ class TestReadExternalCatalogue:
         with pytest.raises(ValueError, match="target_dec"):
             crossmatch.read_external_catalogue(path)
 
+    def test_id_column_is_optional_and_ignored_when_unset(self, tmp_path):
+        path = tmp_path / "external.csv"
+        self._table().write(path, format="ascii.csv")  # no id column at all
+        result = crossmatch.read_external_catalogue(path)  # must not raise
+        assert list(result["z"]) == [0.01, 0.02]
+
+    def test_id_column_is_validated_when_given(self, tmp_path):
+        path = tmp_path / "external.csv"
+        self._table().write(path, format="ascii.csv")  # no target_id column
+        with pytest.raises(ValueError, match="target_id"):
+            crossmatch.read_external_catalogue(path, id_column="target_id")
+
+    def test_reads_id_column_when_present(self, tmp_path):
+        path = tmp_path / "external_with_id.csv"
+        table = self._table()
+        table["target_id"] = [111, 222]
+        table.write(path, format="ascii.csv")
+        result = crossmatch.read_external_catalogue(path, id_column="target_id")
+        assert list(result["target_id"]) == [111, 222]
+
 
 class TestCrossmatchRedshifts:
     def test_matches_a_real_source_within_tolerance(self):
@@ -112,11 +132,33 @@ class TestCrossmatchRedshifts:
         assert matched_row["external_sep_arcsec"][0] == pytest.approx(1.0, abs=1e-3)
         assert len(matched_row["external_vel_diff_km_s"]) == 1
         assert matched_row["external_catalogue_name"] == "DESI"
+        # id_column wasn't given -- external_id stays empty even on a matched row,
+        # not length-mismatched garbage.
+        assert len(matched_row["external_id"]) == 0
 
         other_rows = result.table[result.table["name"] != REAL_SOURCE_NAME]
         assert all(len(z) == 0 for z in other_rows["external_z"])
         assert all(len(ra) == 0 for ra in other_rows["external_ra"])
         assert np.all(other_rows["external_catalogue_name"] == "")
+
+    def test_includes_matched_ids_when_id_column_given(self):
+        hi_table = _real_hi_table()
+        row = _real_source_row(hi_table)
+        center = SkyCoord(ra=float(row["ra"][0]), dec=float(row["dec"][0]), unit="deg")
+        offset = _offset_position(center, sep_arcsec=1.0)
+        matching_z = _matching_z(row)
+
+        external = Table(
+            {
+                "z": [matching_z],
+                "target_ra": [offset.ra.deg],
+                "target_dec": [offset.dec.deg],
+                "target_id": [396330000123],
+            }
+        )
+        result = crossmatch.crossmatch_redshifts(hi_table, external, id_column="target_id")
+        matched_row = result.table[result.table["name"] == REAL_SOURCE_NAME][0]
+        assert list(matched_row["external_id"]) == [396330000123]
 
     def test_position_within_tolerance_but_velocity_too_different_does_not_match(self):
         hi_table = _real_hi_table()

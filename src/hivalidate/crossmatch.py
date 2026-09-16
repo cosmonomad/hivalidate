@@ -22,6 +22,7 @@ def read_external_catalogue(
     ra_column: str = "target_ra",
     dec_column: str = "target_dec",
     z_column: str = "z",
+    id_column: str | None = None,
 ) -> Table:
     """Read an external spectroscopic redshift catalogue for cross-matching against
     HI detections. Uses astropy's unified I/O (`Table.read`, format auto-detected
@@ -32,13 +33,19 @@ def read_external_catalogue(
     real DESI VOTable-XML TAP query result; also handles FITS tables, CSV, etc. --
     anything astropy's `Table.read` can identify without an explicit `format=`.
 
-    Only `ra_column`/`dec_column`/`z_column` need to exist -- every other column in
-    the source file is read but otherwise ignored. Defaults match the DESI
+    `ra_column`/`dec_column`/`z_column` always need to exist -- every other column
+    in the source file is read but otherwise ignored. Defaults match the DESI
     catalogue this was built against (`target_ra`/`target_dec`/`z`); pass the
     actual names for a differently-named catalogue (e.g. GAMA's `RA`/`DEC`/`Z`).
+    `id_column` (e.g. DESI's `target_id`, GAMA's `CATAID`) is optional -- only
+    validated if given, since an ID isn't needed for the match itself, only for
+    display (see `crossmatch_redshifts`).
     """
     table = Table.read(path)
-    missing = [c for c in (ra_column, dec_column, z_column) if c not in table.colnames]
+    required = [ra_column, dec_column, z_column]
+    if id_column is not None:
+        required.append(id_column)
+    missing = [c for c in required if c not in table.colnames]
     if missing:
         raise ValueError(f"{path}: missing expected column(s) {missing!r} -- got {table.colnames}")
     return table
@@ -60,6 +67,7 @@ def crossmatch_redshifts(
     vel_tol_base_km_s: float = 30.0,
     vel_tol_wm50_factor: float = 0.6,
     catalogue_name: str = "External",
+    id_column: str | None = None,
 ) -> CrossmatchResult:
     """Cross-match each row of `hi_table` (a SoFiA catalogue) against
     `external_table` (see `read_external_catalogue`) by position + velocity -- the
@@ -82,7 +90,7 @@ def crossmatch_redshifts(
     data, dev session 2026-09-15, before this rewrite; now moot, since all
     in-tolerance candidates are kept).
 
-    Adds six columns to a copy of `hi_table`:
+    Adds seven columns to a copy of `hi_table`:
 
     - ``external_z``: matched redshift(s) -- a variable-length float array per row
       (empty if unmatched, length >1 if multiple counterparts), sorted closest-in-
@@ -93,6 +101,9 @@ def crossmatch_redshifts(
       on the optical panel, the way the legacy script did for GAMA cross-matches
     - ``external_sep_arcsec``/``external_vel_diff_km_s``: angular separation /
       |HI velocity - optical velocity| for each match, same shape as `external_z`
+    - ``external_id``: each match's own catalogue ID (from `id_column`, e.g. DESI's
+      `target_id`), same shape as `external_z` -- empty (not just unpopulated) for
+      every row if `id_column` is left unset, same as an unmatched row's `external_z`
     - ``external_catalogue_name``: `catalogue_name` verbatim (a single string, not
       an array -- one external catalogue per `crossmatch_redshifts` call), empty
       for a row with no match
@@ -109,6 +120,7 @@ def crossmatch_redshifts(
     external_dec: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
     external_sep_arcsec: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
     external_vel_diff_km_s: list[np.ndarray] = [np.array([], dtype=float) for _ in range(n)]
+    external_id: list[np.ndarray] = [np.array([], dtype=object) for _ in range(n)]
     external_catalogue_name = np.full(n, "", dtype=object)
 
     if n > 0 and len(external_table) > 0:
@@ -124,6 +136,7 @@ def crossmatch_redshifts(
         ext_z = np.asarray(external_table[z_column])
         ext_velocity_km_s = conversions.redshift_to_velocity(ext_z)
         vel_tol_km_s = vel_tol_wm50_factor * hi_wm50_velocity_km_s + vel_tol_base_km_s
+        ext_id = np.asarray(external_table[id_column]) if id_column is not None else None
 
         # a.search_around_sky(b, sep) returns (idx_into_b, idx_into_a, sep2d, d3d) --
         # the "self" indices come second, not first (verified empirically, not just
@@ -157,6 +170,8 @@ def crossmatch_redshifts(
                 external_dec[hi_idx] = ext_dec[ext_group]
                 external_sep_arcsec[hi_idx] = sep_group
                 external_vel_diff_km_s[hi_idx] = vel_group
+                if ext_id is not None:
+                    external_id[hi_idx] = ext_id[ext_group]
                 external_catalogue_name[hi_idx] = catalogue_name
 
     hi_table["external_z"] = external_z
@@ -164,6 +179,7 @@ def crossmatch_redshifts(
     hi_table["external_dec"] = external_dec
     hi_table["external_sep_arcsec"] = external_sep_arcsec
     hi_table["external_vel_diff_km_s"] = external_vel_diff_km_s
+    hi_table["external_id"] = external_id
     hi_table["external_catalogue_name"] = external_catalogue_name
     n_matched = sum(1 for z in external_z if len(z) > 0)
     return CrossmatchResult(table=hi_table, n_matched=n_matched)

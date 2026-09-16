@@ -321,9 +321,10 @@ class TestExternalRedshiftMatchOverlay:
         self,
         matches: list[tuple[float, float]] | None = None,
         catalogue_name: str | None = "DESI",
+        ids: list[int] | None = None,
     ) -> Table:
         """`matches`: list of (sep_arcsec, z) pairs -- defaults to a single match
-        5" away at z=0.05.
+        5" away at z=0.05. `ids`, if given, must be the same length as `matches`.
         """
         if matches is None:
             matches = [(5.0, 0.05)]
@@ -338,6 +339,9 @@ class TestExternalRedshiftMatchOverlay:
         data["external_dec"] = [np.array([p.dec.deg for p in positions], dtype=float)]
         if catalogue_name is not None:
             data["external_catalogue_name"] = [catalogue_name]
+        if ids is not None:
+            assert len(ids) == len(matches)
+            data["external_id"] = [np.array(ids, dtype=object)]
         return Table(data)[0]
 
     def test_overlays_marker_and_spectrum_line_labelled_with_the_catalogue_name(self):
@@ -350,12 +354,12 @@ class TestExternalRedshiftMatchOverlay:
         assert len(ax_opt.collections) >= 1  # the scatter marker
         opt_legend = ax_opt.get_legend()
         assert opt_legend is not None
-        assert any("DESI z=0.0500" in t.get_text() for t in opt_legend.get_texts())
+        assert any(t.get_text() == "DESI" for t in opt_legend.get_texts())
 
         ax_spec = fig.axes[2]
         spec_legend = ax_spec.get_legend()
         assert spec_legend is not None
-        assert any("DESI z=0.0500" in t.get_text() for t in spec_legend.get_texts())
+        assert any(t.get_text() == "DESI" for t in spec_legend.get_texts())
         expected_vel = conversions.redshift_to_velocity(0.05)
         match_lines = [
             ln
@@ -364,6 +368,41 @@ class TestExternalRedshiftMatchOverlay:
         ]
         assert [ln.get_xdata()[0] for ln in match_lines] == pytest.approx([expected_vel])
         assert match_lines[0].get_color() == _EXTERNAL_MATCH_COLORS[0]
+
+    def test_label_includes_the_catalogue_id_when_available(self):
+        # Direct user request: the DESI catalogue was updated to include target_id,
+        # and cross-matched sources should show it on the plot.
+        row = self._row_with_matches(
+            matches=[(5.0, 0.05)], catalogue_name="DESI", ids=[396330000123]
+        )
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        opt_legend = fig.axes[0].get_legend()
+        assert any(t.get_text() == "DESI 396330000123" for t in opt_legend.get_texts())
+        spec_legend = fig.axes[2].get_legend()
+        assert any(t.get_text() == "DESI 396330000123" for t in spec_legend.get_texts())
+
+    def test_label_omits_id_when_external_id_is_shorter_than_external_z(self):
+        # This is the normal case when external_redshift_catalogue_id_column was
+        # left unset: crossmatch_redshifts leaves every row's external_id an empty
+        # array regardless of how many real matches external_z has. Must fall back
+        # cleanly, not misalign via zip() truncating to the shorter array.
+        base_row = self._row_with_matches(matches=[(5.0, 0.05), (12.0, 0.052)])
+        data = {name: [base_row[name]] for name in base_row.colnames}
+        data["external_id"] = [np.array([], dtype=object)]  # deliberately mismatched length
+        row = Table(data)[0]
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        fig = build_validation_figure(
+            row, cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        opt_legend = fig.axes[0].get_legend()
+        # Both matches show the identical "DESI" label -- no ID to distinguish them
+        # by, and the redshift was deliberately dropped from the label (it's still
+        # readable off the spectrum panel's own axes). Two separate legend entries
+        # regardless, one per marker.
+        assert [t.get_text() for t in opt_legend.get_texts()] == ["DESI", "DESI"]
 
     def test_overlays_a_marker_and_line_per_match_for_multiple_counterparts(self):
         # An HI detection can have more than one real optical counterpart (an
@@ -378,9 +417,7 @@ class TestExternalRedshiftMatchOverlay:
         assert len(ax_opt.collections) >= 2  # one scatter marker per match
         opt_legend = ax_opt.get_legend()
         assert opt_legend is not None
-        opt_labels = {t.get_text() for t in opt_legend.get_texts()}
-        assert "DESI z=0.0500" in opt_labels
-        assert "DESI z=0.0520" in opt_labels
+        assert [t.get_text() for t in opt_legend.get_texts()] == ["DESI", "DESI"]
 
         ax_spec = fig.axes[2]
         match_lines = [
@@ -411,7 +448,7 @@ class TestExternalRedshiftMatchOverlay:
         )
         opt_legend = fig.axes[0].get_legend()
         assert opt_legend is not None
-        assert any("External z=0.0500" in t.get_text() for t in opt_legend.get_texts())
+        assert any(t.get_text() == "External" for t in opt_legend.get_texts())
 
     def test_no_overlay_when_row_has_no_external_match_columns(self):
         row = _real_row()

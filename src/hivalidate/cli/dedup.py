@@ -46,7 +46,10 @@ def run(config: Config) -> None:
         logger.info(
             "Cross-matching against %s", config.paths.external_redshift_catalogue
         )
-        external = crossmatch.read_external_catalogue(config.paths.external_redshift_catalogue)
+        external = crossmatch.read_external_catalogue(
+            config.paths.external_redshift_catalogue,
+            id_column=config.paths.external_redshift_catalogue_id_column,
+        )
         cx_result = crossmatch.crossmatch_redshifts(
             deduped,
             external,
@@ -54,6 +57,7 @@ def run(config: Config) -> None:
             vel_tol_base_km_s=config.dedup.vel_tol_base_km_s,
             vel_tol_wm50_factor=config.dedup.vel_tol_wm50_factor,
             catalogue_name=config.paths.external_redshift_catalogue_name,
+            id_column=config.paths.external_redshift_catalogue_id_column,
         )
         logger.info(
             "Matched %d/%d sources to a %s redshift",

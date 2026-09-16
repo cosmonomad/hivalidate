@@ -84,11 +84,17 @@ def test_dedup_crossmatches_against_an_external_redshift_catalogue_when_configur
     velocity_km_s = conversions.freq_to_velocity(float(row["freq"][0]))
     matching_z = velocity_km_s / conversions.SPEED_OF_LIGHT_KM_S
     external_path = tmp_path / "external_redshifts.xml"
-    Table({"z": [matching_z], "target_ra": [center.ra.deg], "target_dec": [center.dec.deg]}).write(
-        external_path, format="votable"
-    )
+    Table(
+        {
+            "z": [matching_z],
+            "target_ra": [center.ra.deg],
+            "target_dec": [center.dec.deg],
+            "target_id": [396330000123],
+        }
+    ).write(external_path, format="votable")
     config.paths.external_redshift_catalogue = external_path
     config.paths.external_redshift_catalogue_name = "DESI"
+    config.paths.external_redshift_catalogue_id_column = "target_id"
 
     dedup.run(config)
     deduped = catalogue.read_votable(config.paths.deduped_catalogue)
@@ -97,6 +103,7 @@ def test_dedup_crossmatches_against_an_external_redshift_catalogue_when_configur
     assert len(matched_row["external_z"]) == 1
     assert matched_row["external_z"][0] == pytest.approx(matching_z)
     assert matched_row["external_catalogue_name"] == "DESI"
+    assert list(matched_row["external_id"]) == [396330000123]
 
 
 def test_dedup_fails_clearly_if_combine_was_not_run_first(tmp_path):

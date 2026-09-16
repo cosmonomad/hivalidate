@@ -13,6 +13,7 @@ paths:
   # so no override needed.
   external_redshift_catalogue: ../data/NGC4808/DESI_NGC4808.xml
   external_redshift_catalogue_name: DESI
+  external_redshift_catalogue_id_column: target_id
   field_mosaic: ../data/NGC4808/run_sofia/mom0.fits
 
 dedup:

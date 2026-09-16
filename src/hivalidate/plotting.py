@@ -29,9 +29,11 @@ GAMA cross-matches: a marker at the matched position on the optical panel (cycli
 through `_EXTERNAL_MATCH_MARKERS` if there's more than one -- an HI detection can
 have more than one real optical counterpart, since HI is often more spatially
 extended than any single galaxy it overlaps), and a dashed vertical line at its
-equivalent velocity on the spectrum panel, each labelled with its own matched
-redshift. Silently omitted if `row` wasn't cross-matched (no external catalogue
-configured, or no match within tolerance) -- not an error.
+equivalent velocity on the spectrum panel, each labelled with its catalogue name
+and ID if one is available (see `_external_match_label`) -- not the redshift, which
+is easy enough to read off the spectrum panel's own axes and made an already-long
+catalogue ID even more crowded. Silently omitted if `row` wasn't cross-matched (no
+external catalogue configured, or no match within tolerance) -- not an error.
 
 Every sky panel (optical, continuum, mom0, mom1) is pinned to the same real
 angular field of view, computed from the mom0 image's own WCS
@@ -334,7 +336,9 @@ def build_validation_figure(
             transform=ax_opt.get_transform("fk5"),
         )
         ax_opt.add_patch(ellipse)
-        for i, (match_ra, match_dec, _, match_z, match_catalogue) in enumerate(external_matches):
+        for i, (match_ra, match_dec, _, _, match_catalogue, match_id) in enumerate(
+            external_matches
+        ):
             ax_opt.scatter(
                 match_ra,
                 match_dec,
@@ -343,7 +347,7 @@ def build_validation_figure(
                 marker=_EXTERNAL_MATCH_MARKERS[i % len(_EXTERNAL_MATCH_MARKERS)],
                 lw=2.0,
                 color=_EXTERNAL_MATCH_COLORS[i % len(_EXTERNAL_MATCH_COLORS)],
-                label=f"{match_catalogue} z={match_z:.4f}",
+                label=_external_match_label(match_catalogue, match_id),
             )
         if external_matches:
             ax_opt.legend(loc="upper left", frameon=True)
@@ -385,13 +389,13 @@ def build_validation_figure(
     ax_spec.plot(vel, cubelets.spec_flux_jy, color="k")
     ax_spec.axvline(v_sys, color="grey", ls="dotted")
     ax_spec.axhline(0, color="grey", ls="dotted")
-    for i, (_, _, match_vel_km_s, match_z, match_catalogue) in enumerate(external_matches):
+    for i, (_, _, match_vel_km_s, _, match_catalogue, match_id) in enumerate(external_matches):
         ax_spec.axvline(
             match_vel_km_s,
             color=_EXTERNAL_MATCH_COLORS[i % len(_EXTERNAL_MATCH_COLORS)],
             ls="dashed",
             lw=1.5,
-            label=f"{match_catalogue} z={match_z:.4f}",
+            label=_external_match_label(match_catalogue, match_id),
         )
     if external_matches:
         ax_spec.legend(loc="upper left", frameon=False)
@@ -512,8 +516,20 @@ def _beam_location(
     return float(location.ra.deg), float(location.dec.deg)
 
 
-def _external_matches(row: Row) -> list[tuple[float, float, float, float, str]]:
-    """[(ra, dec, velocity_km_s, z, catalogue_name), ...] for every
+def _external_match_label(catalogue_name: str, match_id: object) -> str:
+    """Legend label for one cross-match marker/line: "DESI 39627..." if an ID is
+    available (see `_external_matches`), else just "DESI". No redshift in the label
+    (direct user request): a long catalogue ID already made the label crowded, and
+    the redshift is easy enough to read off the spectrum panel's own
+    velocity/frequency axes -- the dashed line is drawn at exactly that velocity.
+    """
+    if match_id is None:
+        return catalogue_name
+    return f"{catalogue_name} {match_id}"
+
+
+def _external_matches(row: Row) -> list[tuple[float, float, float, float, str, object]]:
+    """[(ra, dec, velocity_km_s, z, catalogue_name, id), ...] for every
     `hivalidate.crossmatch` external-redshift match on this source, closest in
     position first -- an HI detection can have more than one real optical
     counterpart (see `crossmatch.crossmatch_redshifts`'s docstring), so this is a
@@ -524,7 +540,12 @@ def _external_matches(row: Row) -> list[tuple[float, float, float, float, str]]:
     has no `external_z` column at all -- the same "no matches" outcome). `catalogue_name`
     (e.g. "DESI", "GAMA" -- see `Config.paths.external_redshift_catalogue_name`)
     falls back to a generic "External" if that column is missing, for a match
-    produced before it existed.
+    produced before it existed. `id` (e.g. DESI's `target_id`) is None per match if
+    `external_id` is missing entirely, or if its length doesn't match `external_z`'s
+    -- the latter is the normal case when `Config.paths.
+    external_redshift_catalogue_id_column` was left unset, since `crossmatch_redshifts`
+    then leaves every row's `external_id` an empty array regardless of how many
+    real matches it has.
     """
     if "external_z" not in row.colnames or len(row["external_z"]) == 0:
         return []
@@ -532,6 +553,10 @@ def _external_matches(row: Row) -> list[tuple[float, float, float, float, str]]:
         catalogue_name = str(row["external_catalogue_name"])
     else:
         catalogue_name = "External"
+    if "external_id" in row.colnames and len(row["external_id"]) == len(row["external_z"]):
+        ids = list(row["external_id"])
+    else:
+        ids = [None] * len(row["external_z"])
     return [
         (
             float(ra),
@@ -539,8 +564,11 @@ def _external_matches(row: Row) -> list[tuple[float, float, float, float, str]]:
             conversions.redshift_to_velocity(float(z)),
             float(z),
             catalogue_name,
+            match_id,
         )
-        for ra, dec, z in zip(row["external_ra"], row["external_dec"], row["external_z"])
+        for ra, dec, z, match_id in zip(
+            row["external_ra"], row["external_dec"], row["external_z"], ids
+        )
     ]
 
 

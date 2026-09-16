@@ -190,15 +190,16 @@ _CONTINUUM_VMIN_SIGMA = 3.0
 _CONTINUUM_VMAX_SIGMA = 25.0
 
 #: Colors cycled through for external-redshift-match markers/lines (see
-#: _external_matches), one per simultaneous match on a given source. Not
-#: "C0"/"C1"/etc: the mom0 contour panel already cycles through C0-C5 for its six
-#: levels (`contour_levels` in build_validation_figure), and the beam ellipse is
-#: "C3" -- "C0" alone was picked first and turned out to be the same blue as one of
-#: the contour levels (direct user feedback); after adding support for more than
-#: one match per source, per-match color variation was requested too, so this is
-#: now a palette, not a single color -- checked by eye against all six contour
-#: colors (dev session 2026-09-15) to confirm none of them collide.
-_EXTERNAL_MATCH_COLORS = ["magenta", "cyan", "gold", "deeppink", "turquoise", "hotpink"]
+#: _external_matches), one per simultaneous match on a given source: matplotlib's
+#: default "C0".."C9" cycle, minus "C0" itself. The mom0 contour panel
+#: (`contour_levels` in build_validation_figure) calls `ax.contour(...)` with no
+#: explicit `colors`/`cmap`, so its levels are colored from the default colormap
+#: (viridis-like), not the categorical C0-C9 cycle -- only its dark-blue/purple low
+#: end happens to resemble "C0", which is why an earlier version avoided the whole
+#: cycle instead of just that one color (direct user correction, dev session
+#: 2026-09-16). "C3" is also the beam ellipse's color, but that's a large fixed-
+#: position filled ellipse, not easily confused with a small match marker/line.
+_EXTERNAL_MATCH_COLORS = [f"C{i}" for i in range(1, 10)]
 
 #: Marker shapes cycled through alongside _EXTERNAL_MATCH_COLORS on the optical
 #: panel (matches the legacy script's own per-match marker cycling for GAMA

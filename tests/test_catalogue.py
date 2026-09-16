@@ -39,6 +39,50 @@ class TestWriteCsv:
         catalogue.write_csv(table, out)  # must not raise on the second write
         assert out.exists()
 
+    def test_flattens_array_valued_crossmatch_columns_without_raising(self, tmp_path):
+        # crossmatch.crossmatch_redshifts's multi-match columns (external_z, etc.) are
+        # object-dtype, one variable-length numpy array per row -- astropy's fast CSV
+        # writer can't hash those and raises `TypeError: unhashable type` (found live,
+        # running postprocess against a real crossmatched catalogue).
+        import numpy as np
+        from astropy.table import Table
+
+        table = Table(
+            {
+                "name": ["a", "b"],
+                "external_z": [np.array([0.01, 0.02]), np.array([], dtype=float)],
+                "external_catalogue_name": ["DESI", ""],
+            }
+        )
+        out = tmp_path / "out.csv"
+        catalogue.write_csv(table, out)
+
+        import csv
+
+        with open(out) as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["external_z"] == "0.01;0.02"
+        assert rows[0]["external_catalogue_name"] == "DESI"
+        assert rows[1]["external_z"] == ""
+
+    def test_does_not_split_a_scalar_string_stored_as_object_dtype(self, tmp_path):
+        # external_catalogue_name is a per-row scalar string, but astropy still stores
+        # it as object dtype (not fixed-width unicode) once the table also has
+        # array-valued object columns -- joining it character-by-character like an
+        # array cell would silently corrupt it (e.g. "DESI" -> "D;E;S;I").
+        from astropy.table import Column, Table
+
+        table = Table({"name": ["a"]})
+        table["external_catalogue_name"] = Column(["DESI"], dtype=object)
+        out = tmp_path / "out.csv"
+        catalogue.write_csv(table, out)
+
+        import csv
+
+        with open(out) as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["external_catalogue_name"] == "DESI"
+
 
 def test_find_run_catalogues_finds_all_fixture_runs():
     found = catalogue.find_run_catalogues(FIXTURE_DIR)

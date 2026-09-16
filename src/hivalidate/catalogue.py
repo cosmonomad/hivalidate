@@ -41,9 +41,30 @@ def write_csv(table: Table, path: str | Path) -> None:
     would rather not deal with VOTable XML. Shared by every stage that writes a
     catalogue out (`hivalidate.qa`, `hivalidate.postprocess`) so there's one place
     that knows how, not a copy of `Table.write(..., format="ascii.csv")` in each.
+
+    `crossmatch.crossmatch_redshifts` adds columns that hold a variable-length array
+    per row (e.g. `external_z`, one match's redshift per HI detection that can have
+    several) -- astropy's dtype for these is `object`, one raw numpy array per cell,
+    which its fast CSV writer can't hash internally and raises
+    ``TypeError: unhashable type`` on. CSV has no native array-cell notion anyway, so
+    each such column is flattened to a semicolon-joined string (empty string for an
+    unmatched row's empty array) before writing -- lossy only in that it's now text
+    that needs re-splitting to parse back, not in the values themselves.
+
+    `external_catalogue_name` is object-dtype too (plain per-row strings, not arrays,
+    but astropy still stores it unboxed rather than as fixed-width unicode) -- joining
+    a string cell character-by-character would be wrong, so only cells that are
+    actually arrays get joined; anything else is passed through as-is.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    table = table.copy()
+    for name in table.colnames:
+        if table[name].dtype == object:
+            table[name] = [
+                ";".join(str(v) for v in cell) if isinstance(cell, np.ndarray) else cell
+                for cell in table[name]
+            ]
     table.write(path, format="ascii.csv", overwrite=True)
 
 

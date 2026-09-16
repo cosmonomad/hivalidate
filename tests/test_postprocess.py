@@ -14,7 +14,7 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy.wcs import WCS
 
-from hivalidate import catalogue, postprocess
+from hivalidate import catalogue, conversions, postprocess
 from hivalidate.cli import combine, dedup, rename
 from hivalidate.config import Config
 
@@ -41,6 +41,20 @@ def _fake_validated_table():
             ],
             "ra": [0.0, 0.001, 0.002],
             "qa": [1.0, 0.0, float("nan")],
+            # add_derived_physical_columns' inputs -- SoFiA's native frequency-domain
+            # units, matching real catalogue column names.
+            "freq": [1.40e9, 1.35e9, 1.30e9],
+            "w20": [2.0e5, 1.8e5, 1.6e5],
+            "w50": [1.5e5, 1.3e5, 1.1e5],
+            "wm50": [1.4e5, 1.2e5, 1.0e5],
+            "f_sum": [10.0, 5.0, 2.0],
+            "err_f_sum": [0.5, 0.3, 0.1],
+            # write_validation_csv's _CSV_DROPPED_COLUMNS -- present here so those
+            # tests exercise the real drop, not just the absence of an error.
+            "source_run": ["run1", "run1", "run2"],
+            "external_ra": [0.0, 0.001, 0.002],
+            "external_dec": [-30.0, -30.0, -30.0],
+            "external_z": [0.01, 0.02, 0.03],
         }
     )
 
@@ -77,6 +91,92 @@ class TestWriteValidationCsv:
         out = tmp_path / "nested" / "dir" / "out.csv"
         postprocess.write_validation_csv(table, out)
         assert out.exists()
+
+    def test_adds_derived_physical_columns(self, tmp_path):
+        table = _fake_validated_table()[:1]
+        out = tmp_path / "out.csv"
+        postprocess.write_validation_csv(table, out)
+        with open(out) as fh:
+            row = next(csv.DictReader(fh))
+        for column in (
+            "redshift",
+            "velocity_km_s",
+            "w20_km_s",
+            "w50_km_s",
+            "wm50_km_s",
+            "log_hi_mass_msun",
+            "log_hi_mass_msun_err",
+        ):
+            assert column in row
+            assert row[column] != ""
+
+    def test_drops_internal_and_redundant_columns(self, tmp_path):
+        table = _fake_validated_table()[:1]
+        out = tmp_path / "out.csv"
+        postprocess.write_validation_csv(table, out)
+        with open(out) as fh:
+            header = next(csv.reader(fh))
+        for column in postprocess._CSV_DROPPED_COLUMNS:
+            assert column not in header
+        # sep_arcsec/vel_diff/id/catalogue_name are still useful for judging a
+        # cross-match without opening the dry-run plot -- not dropped.
+        assert "name" in header
+
+    def test_missing_external_columns_do_not_raise(self, tmp_path):
+        # No crossmatch configured -> the table has no external_* columns at all;
+        # the drop step must tolerate columns that were never there.
+        table = _fake_validated_table()[:1]
+        table.remove_columns(["external_ra", "external_dec", "external_z"])
+        out = tmp_path / "out.csv"
+        postprocess.write_validation_csv(table, out)  # must not raise
+        assert out.exists()
+
+
+class TestAddDerivedPhysicalColumns:
+    def test_matches_direct_conversions_calls(self):
+        table = _fake_validated_table()
+        result = postprocess.add_derived_physical_columns(table)
+        freq = np.asarray(table["freq"])
+        assert np.allclose(result["redshift"], conversions.freq_to_redshift(freq))
+        assert np.allclose(result["velocity_km_s"], conversions.freq_to_velocity(freq))
+        for width_column in ("w20", "w50", "wm50"):
+            expected = conversions.freq_width_to_velocity_dispersion(
+                np.asarray(table[width_column]), freq
+            )
+            assert np.allclose(result[f"{width_column}_km_s"], expected)
+
+    def test_hi_mass_matches_direct_conversions_call(self):
+        table = _fake_validated_table()
+        result = postprocess.add_derived_physical_columns(table)
+        freq = np.asarray(table["freq"])
+        redshift = conversions.freq_to_redshift(freq)
+        expected_mass = conversions.hi_mass(
+            np.asarray(table["f_sum"]), redshift, rest_frame="frequency"
+        )
+        assert np.allclose(result["log_hi_mass_msun"], expected_mass)
+
+    def test_hi_mass_error_scales_with_relative_flux_error(self):
+        table = _fake_validated_table()
+        result = postprocess.add_derived_physical_columns(table)
+        f_sum = np.asarray(table["f_sum"])
+        err_f_sum = np.asarray(table["err_f_sum"])
+        expected_err = np.abs(err_f_sum / f_sum) / np.log(10)
+        assert np.allclose(result["log_hi_mass_msun_err"], expected_err)
+
+    def test_does_not_mutate_the_input_table(self):
+        table = _fake_validated_table()
+        postprocess.add_derived_physical_columns(table)
+        assert "redshift" not in table.colnames
+
+    def test_empty_table_does_not_raise(self):
+        # astropy's Cosmology.luminosity_distance raises on a size-0 array rather
+        # than returning an empty one -- found live: a QA class with zero sources
+        # reviewed so far (a normal state, not an error) crashed the whole
+        # postprocess run before this was guarded against.
+        table = _fake_validated_table()[:0]
+        result = postprocess.add_derived_physical_columns(table)
+        assert len(result) == 0
+        assert "log_hi_mass_msun" in result.colnames
 
 
 class TestExtractCubelets:

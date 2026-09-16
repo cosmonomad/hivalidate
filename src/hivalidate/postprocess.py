@@ -5,6 +5,9 @@
   scanning a directory of PNG filenames and cross-referencing the SoFiA catalogue,
   because the legacy interactive script never wrote the qa flag anywhere durable
   alongside the catalogue. `validated_cat.xml` already has the `qa` column directly.
+  Also adds derived physical columns (redshift, velocity, w20/w50/wm50 in km/s,
+  HI mass and its error) and drops a few SoFiA/crossmatch columns not useful to a
+  human reviewer (`add_derived_physical_columns`, `write_validation_csv`).
 - A directory of just that class's cubelets -- replaces `legacy/extract_true_cubelets.py`.
 - A directory of just that class's dry-run validation plots, pulled out of the shared
   flat `dry_run/` directory -- so, e.g., every "uncertain" or "duplicate" source can be
@@ -33,7 +36,7 @@ from astropy.wcs import WCS
 from reproject import reproject_interp
 from reproject.mosaicking import reproject_and_coadd
 
-from hivalidate import catalogue
+from hivalidate import catalogue, conversions
 
 #: Matches hivalidate.qa.FLAG_TO_NUMERIC's convention.
 QA_TRUE = 1.0
@@ -60,11 +63,69 @@ def filter_by_qa(validated_catalogue: Table, qa_values: set[float]) -> Table:
     return validated_catalogue[mask]
 
 
-def write_validation_csv(table: Table, output_path: str | Path) -> None:
-    """Thin, stage-specific name for `hivalidate.catalogue.write_csv` -- kept as its
-    own function since `hivalidate.cli.postprocess` calling `write_validation_csv`
-    reads more clearly at the call site than the generic `write_csv`.
+#: Columns dropped from the postprocess CSV -- not useful for a human reviewer
+#: browsing detections (direct user request). `source_run` is an internal
+#: `(source_run, id)` dedup/rename key (PLAN.md issue #6), not physically
+#: meaningful; `external_ra`/`external_dec`/`external_z` duplicate what's already
+#: visible on the per-source dry-run plot's cross-match overlay and label. Kept:
+#: `external_sep_arcsec`/`external_vel_diff_km_s`/`external_id`/
+#: `external_catalogue_name`, which are still useful for judging match quality
+#: without opening a plot. Silently ignored if a table doesn't have one of these
+#: (e.g. no crossmatch was configured, so the external_* columns don't exist).
+_CSV_DROPPED_COLUMNS = ["source_run", "external_z", "external_ra", "external_dec"]
+
+
+def add_derived_physical_columns(table: Table) -> Table:
+    """Add velocity-domain/redshift/HI-mass columns derived from SoFiA's native
+    frequency-domain catalogue columns (`freq`, `w20`/`w50`/`wm50`, `f_sum`,
+    `err_f_sum`) -- what a validator actually wants to read off the postprocess CSV,
+    rather than raw SoFiA units they'd have to convert by hand (direct user request).
+
+    Returns a copy; does not mutate `table` in place.
     """
+    table = table.copy()
+    freq_hz = np.asarray(table["freq"])
+    redshift = conversions.freq_to_redshift(freq_hz)
+    table["redshift"] = redshift
+    table["velocity_km_s"] = conversions.freq_to_velocity(freq_hz)
+    for width_column in ("w20", "w50", "wm50"):
+        table[f"{width_column}_km_s"] = conversions.freq_width_to_velocity_dispersion(
+            np.asarray(table[width_column]), freq_hz
+        )
+
+    f_sum = np.asarray(table["f_sum"])
+    err_f_sum = np.asarray(table["err_f_sum"])
+    if len(table) == 0:
+        # astropy's Cosmology.luminosity_distance (conversions.hi_mass's main cost)
+        # wraps a np.vectorize call that raises on a size-0 input rather than just
+        # returning an empty array -- found live: a QA class with zero sources so
+        # far (a completely normal, non-error state for postprocess) would otherwise
+        # crash the whole run. No cosmology call needed for zero rows anyway.
+        log_hi_mass_msun = np.array([], dtype=float)
+        log_hi_mass_msun_err = np.array([], dtype=float)
+    else:
+        log_hi_mass_msun = conversions.hi_mass(f_sum, redshift, rest_frame="frequency")
+        # log10(M) = log10(K) + log10(S) for some (measurement-error-independent) K,
+        # so d(log10 M) = dS / (S * ln(10)) -- the usual dex-uncertainty propagation
+        # for a quantity computed from a base-10 log of something with a linear flux
+        # error.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_hi_mass_msun_err = np.abs(err_f_sum / f_sum) / np.log(10)
+    table["log_hi_mass_msun"] = log_hi_mass_msun
+    table["log_hi_mass_msun_err"] = log_hi_mass_msun_err
+    return table
+
+
+def write_validation_csv(table: Table, output_path: str | Path) -> None:
+    """Adds `add_derived_physical_columns`' velocity/redshift/HI-mass columns, drops
+    `_CSV_DROPPED_COLUMNS`, and writes the result via `hivalidate.catalogue.write_csv`
+    -- kept as its own function since `hivalidate.cli.postprocess` calling
+    `write_validation_csv` reads more clearly at the call site than the generic
+    `write_csv`, and because this is where the postprocess-CSV-specific column
+    transformations belong (the VOTable catalogues stay in SoFiA's native units).
+    """
+    table = add_derived_physical_columns(table)
+    table.remove_columns([c for c in _CSV_DROPPED_COLUMNS if c in table.colnames])
     catalogue.write_csv(table, output_path)
 
 

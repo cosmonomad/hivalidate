@@ -34,22 +34,33 @@ from hivalidate.cutouts.optical import LegacySurveyBackend, SkyViewBackend  # no
 
 logger = logging.getLogger(__name__)
 
-#: Target size (pixels, per side) for the field-wide Legacy Survey cutout.
+#: Target size (pixels, per side) for the field-wide Legacy Survey cutout. Direct
+#: user request was to match the field mosaic FITS's own real pixel dimensions
+#: (SoFiA's mom0 mosaics this pipeline has seen are ~4000x4000) -- but
+#: legacysurvey.org's cutout.fits endpoint has its own hard ceiling, confirmed live:
+#: a `size=4000` request silently returned a 3000x3000 image (no error, no
+#: indication in the response that anything was capped), so 3000 is the real
+#: achievable maximum via a single request, not 4000. (Matching the mosaic's exact
+#: resolution would need tiling several cutouts together and reprojecting/coadding
+#: them, the same way `postprocess.build_mosaic` combines per-source mom0s --
+#: not implemented here.)
 #: LegacySurveyBackend's per-source default pixel scale (0.262"/pix) would try to
 #: fetch a field several degrees across at native resolution -- tens of thousands of
 #: pixels a side, confirmed live to just time out. A pixel scale computed from the
 #: field's own real FOV against this target keeps the request a size the service
 #: actually answers while still far sharper than SkyView's fixed 300x300 output.
-#: 2000 (not higher): confirmed live that response time at this target is not a
-#: simple function of pixel count -- two different ~6x6 deg fields at this same
-#: target took 23s and 138s respectively (server load/caching, not request size),
-#: so `_FIELD_OVERVIEW_TIMEOUT_S` below matters at least as much as this number.
-_FIELD_OVERVIEW_TARGET_PIXELS = 2000
+#: Response time at this (server-clamped) size is not a simple function of the
+#: field's angular size -- confirmed live: NGC4808 took 79s, SB82605 took 192s,
+#: both landing on the same clamped 3000x3000 output, so `_FIELD_OVERVIEW_TIMEOUT_S`
+#: below matters at least as much as this number.
+_FIELD_OVERVIEW_TARGET_PIXELS = 3000
 
-#: Generous enough for the slower of the two real timings above (138s) with margin;
-#: LegacySurveyBackend's per-source default (30s) is far too tight for a field-sized
-#: request and would abort a legitimately-still-working fetch as a failure.
-_FIELD_OVERVIEW_TIMEOUT_S = 180.0
+#: Generous enough for the slower of the two real timings above (192s, at the
+#: server's clamped 3000x3000 output -- see `_FIELD_OVERVIEW_TARGET_PIXELS`) with
+#: real margin, not just barely over it -- LegacySurveyBackend's per-source default
+#: (30s) is far too tight for a field-sized request and would abort a legitimately-
+#: still-working fetch as a failure.
+_FIELD_OVERVIEW_TIMEOUT_S = 300.0
 
 
 def run(config: Config) -> None:

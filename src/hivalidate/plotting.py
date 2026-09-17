@@ -191,6 +191,22 @@ _VMAX_SIGMA = 50.0
 _CONTINUUM_VMIN_SIGMA = 3.0
 _CONTINUUM_VMAX_SIGMA = 25.0
 
+#: PV-panel override for `_background_anchored_norm`'s vmin/vmax sigma multiples.
+#: Direct user report: a single RFI-dominated channel (a real case, SoFiA
+#: J125509.68+075448.9 -- confirmed live, one channel's peak came out ~10x a
+#: typical channel's) blew out a plain linear min/max stretch, crushing the real
+#: (much fainter) HI signal to near-invisibility the same way a bright compact
+#: source did for the continuum panel. Lower than the optical/continuum sigmas
+#: (which anchor a mostly-empty-sky background) since PV data has no comparable
+#: "background fills nearly the whole frame" assumption -- picked by comparing a
+#: grid of (vmin_sigma, vmax_sigma) against that real RFI-affected source (2.0, 4.0
+#: revealed its rotation-curve-like emission feature clearly while the RFI channel
+#: stayed visible, not hidden, as a bright but no longer scale-dominating row) and
+#: sanity-checked against three ordinary (non-RFI) real sources to confirm it
+#: doesn't wash out a normal PV trace.
+_PV_VMIN_SIGMA = 2.0
+_PV_VMAX_SIGMA = 4.0
+
 #: Colors cycled through for external-redshift-match markers/lines (see
 #: _external_matches), one per simultaneous match on a given source: matplotlib's
 #: default "C0".."C9" cycle, minus "C0" itself. The mom0 contour panel
@@ -215,8 +231,8 @@ _EXTERNAL_MATCH_MARKERS = ["x", "+", "*", "D", "^", "v", "s"]
 def _background_anchored_norm(
     data: np.ndarray, vmin_sigma: float = 1.0, vmax_sigma: float = _VMAX_SIGMA
 ) -> ImageNormalize:
-    """A background-anchored asinh normalization, shared by the optical and
-    continuum panels, instead of a linear mean +/- n*std. Real sky images (optical
+    """A background-anchored asinh normalization, shared by the optical, continuum,
+    and PV panels, instead of a linear mean +/- n*std. Real sky images (optical
     or continuum) have most of their dynamic range in a handful of bright-source
     pixels -- under a linear stretch those inflate the std enough that faint
     structure elsewhere gets compressed into a nearly uniform colour and becomes
@@ -233,6 +249,13 @@ def _background_anchored_norm(
     *entire rest of the panel* to a uniform colour -- real sidelobe/ring structure
     around it was completely invisible, not just faint. The asinh version reveals
     it clearly (dev session 2026-09-08).
+
+    The PV panel hits the same failure mode from a different cause: an RFI-
+    dominated channel rather than a bright compact source, but the fix is
+    identical -- `sigma_clipped_stats` robustly excludes the outlier channel from
+    the background estimate the same way it excludes a bright source's core, so a
+    single contaminated channel can't set the whole panel's scale (direct user
+    report, dev session 2026-09-17; see `_PV_VMIN_SIGMA`/`_PV_VMAX_SIGMA`).
 
     vmin/vmax come from `sigma_clipped_stats`'s background median/std, not a
     data-driven interval like `PercentileInterval` or `ZScaleInterval` -- both were
@@ -456,7 +479,14 @@ def build_validation_figure(
         line_pixel = cubelets.pv_wcs.wcs_world2pix(0, freq_c * 1e-6, 0)
         aspect = cubelets.pv_data.shape[1] / cubelets.pv_data.shape[0]
         ax_pv.imshow(
-            cubelets.pv_data, origin="lower", interpolation="nearest", cmap="viridis", aspect=aspect
+            cubelets.pv_data,
+            origin="lower",
+            interpolation="nearest",
+            cmap="viridis",
+            aspect=aspect,
+            norm=_background_anchored_norm(
+                cubelets.pv_data, vmin_sigma=_PV_VMIN_SIGMA, vmax_sigma=_PV_VMAX_SIGMA
+            ),
         )
         ax_pv.axhline(y=line_pixel[1], color="red", linestyle="--")
         ax_pv.coords.grid(color="k", alpha=0.5, linestyle="dashed")

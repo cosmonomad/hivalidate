@@ -149,6 +149,32 @@ class TestBuildValidationFigure:
         texts = [t.get_text() for t in ax_pv.texts]
         assert not any("No PV data available" in t for t in texts)
 
+    def test_pv_panel_color_scale_is_not_dominated_by_a_single_rfi_channel(self):
+        # Direct user report (source SoFiA J125509.68+075448.9): a single
+        # RFI-contaminated channel's peak value can be an order of magnitude above
+        # a typical channel's, and a plain linear min/max stretch anchors vmax to
+        # that one outlier channel, crushing the real (much fainter) HI emission
+        # feature elsewhere in the panel to near-invisibility. The panel's norm
+        # must clamp vmax well below the raw outlier so the real signal gets usable
+        # contrast -- confirmed against this exact failure shape, not just any PV
+        # data.
+        row = _real_row()
+        cubelets = load_source_cubelets(FIXTURE_CUBELETS, "SB82605_Removal_001_1")
+        rng = np.random.default_rng(0)
+        noisy_pv = rng.normal(0, 1.0, size=cubelets.pv_data.shape)
+        rfi_row = cubelets.pv_data.shape[0] // 2
+        noisy_pv[rfi_row, :] = 50.0  # a channel-wide spike, ~50x the noise sigma
+        rfi_cubelets = dataclasses.replace(cubelets, pv_data=noisy_pv)
+
+        fig = build_validation_figure(
+            row, rfi_cubelets, optical=_fake_cutout(), continuum=_fake_cutout()
+        )
+        ax_pv = fig.axes[-1]
+        image = ax_pv.images[0]
+        vmin, vmax = image.norm.vmin, image.norm.vmax
+        assert vmax < 10.0  # well below the raw 50.0 RFI spike
+        assert vmin > -10.0
+
     def test_never_calls_plt_show_or_touches_pyplot_state(self, monkeypatch):
         # This is the whole point of Figure-based construction (PLAN.md issue #3) --
         # if this function ever imports pyplot and calls show()/creates global state,

@@ -159,6 +159,13 @@ a verdict about the source on screen:
 
 - **Resumable**: every flag is written to `qa_results.json` immediately, not batched
   to the end. Re-running the command skips anything already reviewed.
+- **`--reassess`**: re-opens sources already marked with the given class(es) for a
+  second look, e.g. `hivalidate-qa --config ... --reassess uncertain,duplicate` --
+  for uncertain/duplicate calls that need revisiting once more of the field has
+  been reviewed, without re-reviewing everything already marked true/false or
+  hand-editing `qa_results.json`. A never-yet-reviewed source is always included
+  too, same as a normal resumed session; anything not named in `--reassess` (and
+  already reviewed) is skipped as usual.
 - **`b` (back)**: typed at the flag prompt (in place of `t`/`f`/`u`/`d`/`q`), instead
   of answering for the *current* source it discards the *previous* source's saved
   flag/comment and re-displays that source so you can answer again -- for a

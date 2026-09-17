@@ -240,7 +240,7 @@ Never put credentials in a config file that gets committed to git.
 | Dedup | `hivalidate-dedup` | Positional/velocity cross-match dedup, not string match; also cross-matches against an external redshift catalogue if configured |
 | Rename | `hivalidate-rename` | Map per-run numeric IDs to source names, copy cubelets |
 | Dry-run | `hivalidate-dry-run` | Batch-generate validation plots, HPC-safe (`Agg`, no prompts) |
-| QA | `hivalidate-qa` | Interactive review of dry-run output; run locally, not on HPC |
+| QA | `hivalidate-qa` | Interactive review of dry-run output; run locally, not on HPC. `--reassess uncertain,duplicate` re-opens already-reviewed sources in those classes |
 | Post-process | `hivalidate-postprocess` | Per-class (true/false/uncertain/duplicate) CSV, cubelets, plots; true-only mosaic |
 | Whole pipeline | `hivalidate-run-pipeline --mode dry-run` / `--mode qa` | Runs the stages above in sequence, split at the HPC/local boundary |
 

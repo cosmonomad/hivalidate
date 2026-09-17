@@ -186,6 +186,59 @@ class TestRunQaSessionBack:
         assert len(results) >= 1
 
 
+class TestRunQaSessionReassess:
+    """Direct user request: a way to re-open sources already marked uncertain or
+    duplicate for a second look, without re-reviewing everything already marked
+    true/false or hand-editing qa_results.json.
+    """
+
+    def _reviewed(self, config):
+        _, display_fn = _recording_display()
+        responses = [("t", "first"), ("f", "second"), ("u", "third"), ("d", "fourth")]
+        return qa.run_qa_session(config, _scripted(responses), display_fn, _noop_close)
+
+    def test_only_displays_sources_in_the_given_classes(self, prepared_config):
+        self._reviewed(prepared_config)
+
+        seen, display_fn = _recording_display()
+        responses = [("t", "re-reviewed"), ("t", "re-reviewed")]
+        qa.run_qa_session(
+            prepared_config,
+            _scripted(responses),
+            display_fn,
+            _noop_close,
+            reassess_classes={"uncertain", "duplicate"},
+        )
+        assert len(seen) == 2  # only the uncertain + duplicate sources were shown
+
+    def test_overwrites_the_reassessed_sources_flags_and_leaves_the_rest_untouched(
+        self, prepared_config
+    ):
+        self._reviewed(prepared_config)
+
+        _, display_fn = _recording_display()
+        responses = [("t", "re-reviewed"), ("f", "re-reviewed")]
+        results = qa.run_qa_session(
+            prepared_config,
+            _scripted(responses),
+            display_fn,
+            _noop_close,
+            reassess_classes={"uncertain", "duplicate"},
+        )
+
+        flags = {r["qa_flag"] for r in results.values()}
+        assert flags == {"t", "f"}  # no more "u"/"d" left after reassessment
+        assert sum(1 for r in results.values() if r["comment"] == "re-reviewed") == 2
+        assert sum(1 for r in results.values() if r["comment"] in {"first", "second"}) == 2
+
+    def test_reassess_classes_none_behaves_like_a_normal_resume(self, prepared_config):
+        self._reviewed(prepared_config)
+
+        seen, display_fn = _recording_display()
+        qa.run_qa_session(prepared_config, _scripted([]), display_fn, _noop_close)
+        assert len(seen) == 0  # nothing re-displayed without reassess_classes
+
+
 class TestMergeQaIntoCatalogue:
     def test_unreviewed_sources_get_nan_qa_and_empty_comment(self, prepared_config):
         _, display_fn = _recording_display()

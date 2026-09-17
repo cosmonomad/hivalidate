@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from hivalidate import __version__, catalogue
+from hivalidate import __version__, catalogue, postprocess
 from hivalidate.config import Config
 from hivalidate.provenance import git_commit_hash, now_iso
 
@@ -52,7 +52,9 @@ def save_qa_results(qa_dir: str | Path, results: dict) -> None:
         json.dump(results, fh, indent=2)
 
 
-def run_qa_session(config: Config, prompt_fn, display_fn, close_fn) -> dict:
+def run_qa_session(
+    config: Config, prompt_fn, display_fn, close_fn, reassess_classes: set[str] | None = None
+) -> dict:
     """Runs the review loop and returns the final `qa_results` dict (also persisted
     incrementally to disk after every review, and re-exported to
     `validated_cat.xml` at the end -- see `merge_qa_into_catalogue`).
@@ -60,11 +62,28 @@ def run_qa_session(config: Config, prompt_fn, display_fn, close_fn) -> dict:
     `prompt_fn(source: dict, position: int, total: int) -> (flag: str, comment: str)`
     `display_fn(png_path: Path) -> handle` (opaque, passed straight to `close_fn`)
     `close_fn(handle) -> None`
+
+    By default, resumes a session: anything already in `qa_results.json` is skipped,
+    same as before `reassess_classes` existed. `reassess_classes`, if given (e.g.
+    `{"uncertain", "duplicate"}`, matching `postprocess.QA_CLASSES`'s keys), instead
+    also re-opens every source whose *existing* result falls in one of those classes
+    -- direct user request: uncertain/duplicate calls sometimes need a second look
+    once more of the field has been reviewed, without re-reviewing everything
+    already marked true/false or manually editing qa_results.json by hand. A
+    never-yet-reviewed source is always included regardless of `reassess_classes`,
+    same as a normal resumed session.
     """
     manifest = load_manifest(config.paths.dry_run_dir)
     ok_sources = [s for s in manifest["sources"] if s["status"] == "ok"]
     results = load_qa_results(config.paths.qa_dir)
-    already_done_at_start = set(results.keys())
+
+    if reassess_classes:
+        reassess_numeric = {postprocess.QA_CLASSES[c] for c in reassess_classes}
+        already_done_at_start = {
+            name for name, r in results.items() if r["qa_numeric"] not in reassess_numeric
+        }
+    else:
+        already_done_at_start = set(results.keys())
 
     position = 0
     while position < len(ok_sources):

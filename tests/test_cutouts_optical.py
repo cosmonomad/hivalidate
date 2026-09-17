@@ -153,6 +153,45 @@ class TestLegacySurveyBackendMocked:
         assert f"ra={POSITION.ra.deg}" in captured["url"]
         assert "size=100" in captured["url"]  # 26.2 / 0.262
 
+    def test_coarsens_pixel_scale_instead_of_exceeding_max_cutout_pixels(self, monkeypatch):
+        # A large/elongated source's display FOV can need more pixels than
+        # MAX_CUTOUT_PIXELS at the default (fine) per-source pixel scale --
+        # legacysurvey.org silently clamps such a request to MAX_CUTOUT_PIXELS at
+        # the *requested* pixel scale, delivering less real sky than intended
+        # (found live against a real oversized source: requesting ~4878px at
+        # 0.262"/pix got back 3000x3000 at that same scale, i.e. 786" of real
+        # coverage instead of the requested 1278" -- see MAX_CUTOUT_PIXELS's
+        # docstring). fetch must coarsen the pixel scale first so the delivered
+        # image's real angular size always equals what was requested.
+        captured = {}
+
+        def fake_get(url, timeout):
+            captured["url"] = url
+            buf = io.BytesIO()
+            fits.writeto(buf, _fake_grz_cube(), overwrite=True)
+            return _FakeResponse(200, buf.getvalue())
+
+        monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
+        backend = LegacySurveyBackend(pixscale_arcsec=0.262)
+        backend.fetch(POSITION, size_arcsec=1278.0)  # 1278 / 0.262 ~= 4878 > 3000
+        assert f"size={backend.MAX_CUTOUT_PIXELS}" in captured["url"]
+        assert "pixscale=0.426" in captured["url"]  # 1278 / 3000
+
+    def test_does_not_coarsen_a_request_within_max_cutout_pixels(self, monkeypatch):
+        captured = {}
+
+        def fake_get(url, timeout):
+            captured["url"] = url
+            buf = io.BytesIO()
+            fits.writeto(buf, _fake_grz_cube(), overwrite=True)
+            return _FakeResponse(200, buf.getvalue())
+
+        monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", fake_get)
+        backend = LegacySurveyBackend(pixscale_arcsec=0.262)
+        backend.fetch(POSITION, size_arcsec=26.2)  # well under the cap
+        assert "size=100" in captured["url"]
+        assert "pixscale=0.262" in captured["url"]  # unchanged
+
     def test_fetch_combines_bands_into_a_higher_snr_single_image(self, monkeypatch):
         # The whole point of fetching all three bands instead of one: independent
         # noise realizations of the same real source should combine to less noise

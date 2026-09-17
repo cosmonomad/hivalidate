@@ -622,19 +622,19 @@ def build_true_detections_overview_figure(
     (confirmed against real data: SB82605's and NGC4808's are both ~6x6 deg), far
     wider than any per-source cutout. `cli.postprocess` fetches this with Legacy
     Survey first (its grz composite over SkyView's greyscale DSS2 Red, matching the
-    per-source preference), using a pixel scale computed from the field's own FOV
-    rather than the per-source chain's fine native-resolution default -- at the
-    per-source scale a field this wide would mean an unusably large request
-    (confirmed live: it just times out); a field-appropriate scale does not, though
-    the size actually delivered tops out below what was asked for: `cli.postprocess`
-    targets 3000x3000 (direct user request was to match the field mosaic FITS's own
-    ~4000x4000, but legacysurvey.org's cutout.fits endpoint silently clamps any
-    larger request down to 3000x3000 with no error -- confirmed live, requesting
-    4000 got back 3000). Response time at that clamped size varied from ~80s to
-    ~190s for two different real fields, so `cli.postprocess` uses a generous,
-    non-default request timeout for this fetch specifically. SkyView is the
-    fallback for coverage Legacy
-    Survey's DECam-based layers don't have (e.g. far-northern fields, past their
+    per-source preference). At the per-source chain's fine native-resolution
+    default, a field this wide would need tens of thousands of pixels a side;
+    `LegacySurveyBackend.fetch` instead coarsens its own pixel scale to stay within
+    `MAX_CUTOUT_PIXELS`, so the delivered image's real angular size always matches
+    the field's full real FOV (direct user request was to match the field mosaic
+    FITS's own ~4000x4000 resolution exactly; the achievable maximum via a single
+    request is `MAX_CUTOUT_PIXELS` = 3000, confirmed live to be legacysurvey.org's
+    own hard ceiling -- matching the mosaic's exact resolution would need tiling
+    several cutouts together and reprojecting/coadding them, not implemented here).
+    Response time at that size varied from ~80s to ~190s for two different real
+    fields, so `cli.postprocess` uses a generous, non-default request timeout for
+    this fetch specifically. SkyView is the fallback for coverage Legacy Survey's
+    DECam-based layers don't have (e.g. far-northern fields, past their
     declination ceiling), returning a fixed-size image regardless of the requested
     field of view.
 

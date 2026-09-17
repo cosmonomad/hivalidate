@@ -67,8 +67,8 @@ class _FakeResponse:
 
 def _stub_legacy_survey_get(url, timeout):
     """Stands in for `hivalidate.cutouts.optical.requests.get` -- the field overview
-    step tries Legacy Survey first (`cli.postprocess._FIELD_OVERVIEW_TARGET_PIXELS`),
-    which would otherwise make these "no network" CLI tests hit the real service.
+    step tries Legacy Survey first, which would otherwise make these "no network"
+    CLI tests hit the real service.
     """
     wcs = WCS(naxis=2)
     wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]

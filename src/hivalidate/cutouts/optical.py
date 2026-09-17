@@ -147,6 +147,20 @@ class LegacySurveyBackend(CutoutBackend):
     #: to skip an obviously-hopeless request for a northern position.
     APPROX_DEC_CEILING_DEG = 34.0
 
+    #: legacysurvey.org's cutout.fits endpoint silently clamps any request above
+    #: this many pixels per side down to exactly this many, at the *requested*
+    #: pixel scale -- found live: a real, unusually large/elongated source's
+    #: display FOV (1278", from its own mom0 footprint) needed ~4878px at the
+    #: default per-source pixscale (0.262"/pix); the service returned 3000x3000 at
+    #: that same scale instead, i.e. only 786" of real sky, silently less than
+    #: requested and with no error or indication in the response that anything was
+    #: clamped. `fetch` coarsens the requested pixel scale instead of just letting
+    #: this happen, so the delivered image's real angular size always matches what
+    #: was asked for (at reduced resolution, only for sources big enough to need
+    #: it) rather than silently covering less sky than the mom0 contour drawn over
+    #: it expects.
+    MAX_CUTOUT_PIXELS = 3000
+
     #: Requested in this order; the cutout API returns the cube's leading axis in
     #: the same order, combined by `_combine_bands_for_snr` (band identity doesn't
     #: matter beyond that -- unlike an RGB composite, no channel mapping is needed).
@@ -181,10 +195,17 @@ class LegacySurveyBackend(CutoutBackend):
 
     def fetch(self, position: SkyCoord, size_arcsec: float) -> CutoutResult:
         n_pix = max(int(round(size_arcsec / self.pixscale_arcsec)), 1)
+        pixscale_arcsec = self.pixscale_arcsec
+        if n_pix > self.MAX_CUTOUT_PIXELS:
+            # Coarsen rather than let the service clamp n_pix silently -- see
+            # MAX_CUTOUT_PIXELS's docstring. n_pix * pixscale_arcsec stays exactly
+            # size_arcsec either way; only the resolution changes.
+            pixscale_arcsec = size_arcsec / self.MAX_CUTOUT_PIXELS
+            n_pix = self.MAX_CUTOUT_PIXELS
         url = (
             "https://www.legacysurvey.org/viewer/cutout.fits?"
             f"ra={position.ra.deg}&dec={position.dec.deg}&"
-            f"size={n_pix}&pixscale={self.pixscale_arcsec}&"
+            f"size={n_pix}&pixscale={pixscale_arcsec}&"
             f"layer={self.layer}&bands={self.BANDS}"
         )
 

@@ -264,6 +264,28 @@ class TestExtractCubelets:
         copied = output_dir / f"{prefix}_mom0.fits"
         assert copied.read_bytes() == original.read_bytes()
 
+    def test_a_second_call_removes_files_for_names_no_longer_present(
+        self, prepared_config, tmp_path
+    ):
+        # Simulates a source moving out of this class after hivalidate-qa
+        # --reassess: postprocess must not leave its old cubelets behind from the
+        # previous run (found live -- see _clear_and_recreate's docstring).
+        deduped = catalogue.read_votable(prepared_config.paths.deduped_catalogue)
+        first_name, second_name = str(deduped["name"][0]), str(deduped["name"][1])
+        output_dir = tmp_path / "true_cubelets"
+
+        postprocess.extract_cubelets(
+            prepared_config.paths.renamed_cubelets_dir, output_dir, [first_name, second_name]
+        )
+        assert any(f.name.startswith(first_name.replace(" ", "_")) for f in output_dir.iterdir())
+
+        postprocess.extract_cubelets(
+            prepared_config.paths.renamed_cubelets_dir, output_dir, [second_name]
+        )
+        remaining = list(output_dir.iterdir())
+        assert not any(f.name.startswith(first_name.replace(" ", "_")) for f in remaining)
+        assert any(f.name.startswith(second_name.replace(" ", "_")) for f in remaining)
+
 
 class TestExtractPlots:
     def test_copies_matching_pngs_for_given_names(self, tmp_path):
@@ -287,6 +309,21 @@ class TestExtractPlots:
         output_dir = tmp_path / "true_plots"
         count = postprocess.extract_plots(dry_run_dir, output_dir, ["SoFiA J999999.99-999999.9"])
         assert count == 0
+
+    def test_a_second_call_removes_files_for_names_no_longer_present(self, tmp_path):
+        dry_run_dir = tmp_path / "dry_run"
+        dry_run_dir.mkdir()
+        (dry_run_dir / "SoFiA_J000000.00-300000.0.png").write_bytes(b"fake-png-bytes")
+        (dry_run_dir / "SoFiA_J000001.00-300000.0.png").write_bytes(b"other-png-bytes")
+        output_dir = tmp_path / "true_plots"
+
+        postprocess.extract_plots(
+            dry_run_dir, output_dir, ["SoFiA J000000.00-300000.0", "SoFiA J000001.00-300000.0"]
+        )
+        postprocess.extract_plots(dry_run_dir, output_dir, ["SoFiA J000001.00-300000.0"])
+
+        remaining = {f.name for f in output_dir.iterdir()}
+        assert remaining == {"SoFiA_J000001.00-300000.0.png"}
 
 
 @pytest.fixture

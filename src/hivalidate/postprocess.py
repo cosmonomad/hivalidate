@@ -180,15 +180,32 @@ def write_validation_csv(table: Table, output_path: str | Path) -> None:
     catalogue.write_csv(table, output_path)
 
 
+def _clear_and_recreate(output_dir: Path) -> None:
+    """Empties `output_dir` (if it exists) before `extract_cubelets`/`extract_plots`
+    repopulate it, so re-running postprocess after a source's `qa` class changes
+    (e.g. `hivalidate-qa --reassess`) doesn't leave that source's old cubelets/plots
+    behind in its *previous* class's directory -- found live: a source reassessed
+    from "uncertain" to "true" correctly gained its files under `postprocess/true/`
+    on the next postprocess run, but its stale copies under `postprocess/uncertain/`
+    were never removed, silently out of sync with that class's own (fully
+    overwritten each run) CSV.
+    """
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
 def extract_cubelets(cubelets_dir: str | Path, output_dir: str | Path, names: list[str]) -> int:
     """Copy every cubelet file for each of `names` (as they appear in the catalogue's
     `name` column, e.g. "SoFiA J210149.89-554804.6" -- space-separated, converted to
     the underscore form cubelet filenames actually use) from `cubelets_dir` into
-    `output_dir`. Returns the number of files copied.
+    `output_dir`, clearing whatever was already in `output_dir` first (see
+    `_clear_and_recreate`) so this is idempotent across re-runs even after a
+    source's qa class has changed. Returns the number of files copied.
     """
     cubelets_dir = Path(cubelets_dir)
     output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _clear_and_recreate(output_dir)
 
     count = 0
     for name in names:
@@ -202,7 +219,10 @@ def extract_cubelets(cubelets_dir: str | Path, output_dir: str | Path, names: li
 def extract_plots(dry_run_dir: str | Path, output_dir: str | Path, names: list[str]) -> int:
     """Copy each of `names`' dry-run validation PNG (`hivalidate.cli.dry_run` writes
     exactly one, `<source_name>.png`, per source -- unlike cubelets, no glob needed)
-    from `dry_run_dir` into `output_dir`. Returns the number of files copied.
+    from `dry_run_dir` into `output_dir`, clearing whatever was already in
+    `output_dir` first (see `_clear_and_recreate`) so this is idempotent across
+    re-runs even after a source's qa class has changed. Returns the number of files
+    copied.
 
     A name with no matching PNG (source failed dry-run, or was never processed)
     contributes zero rather than raising -- a partially-completed dry-run batch is a
@@ -210,7 +230,7 @@ def extract_plots(dry_run_dir: str | Path, output_dir: str | Path, names: list[s
     """
     dry_run_dir = Path(dry_run_dir)
     output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _clear_and_recreate(output_dir)
 
     count = 0
     for name in names:

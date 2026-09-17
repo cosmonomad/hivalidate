@@ -229,3 +229,32 @@ class TestPostprocessCli:
         config.paths.work_dir = tmp_path / "work"
         with pytest.raises(SystemExit, match="hivalidate-qa"):
             postprocess.run(config)
+
+    def test_reassessing_a_source_removes_its_files_from_the_old_class(self, validated_config):
+        # End-to-end reproduction of the real workflow this was found in: postprocess
+        # once, reassess a source out of "uncertain" via hivalidate-qa --reassess,
+        # postprocess again -- its cubelets/plots must move, not just accumulate in
+        # both class directories.
+        postprocess.run(validated_config)
+        uncertain_cubelets = validated_config.paths.postprocess_dir / "uncertain" / "cubelets"
+        uncertain_plots = validated_config.paths.postprocess_dir / "uncertain" / "plots"
+        assert list(uncertain_cubelets.iterdir())
+        assert list(uncertain_plots.iterdir())
+
+        qa.run_qa_session(
+            validated_config,
+            _scripted([("t", "reassessed")]),
+            lambda p: p,
+            lambda h: None,
+            reassess_classes={"uncertain"},
+        )
+        postprocess.run(validated_config)
+
+        assert list(uncertain_cubelets.iterdir()) == []
+        assert list(uncertain_plots.iterdir()) == []
+        true_cubelets = validated_config.paths.postprocess_dir / "true" / "cubelets"
+        true_rows = _read_csv_rows(
+            validated_config.paths.postprocess_dir / "true" / "validated_true.csv"
+        )
+        assert len(list(true_cubelets.iterdir())) > 0
+        assert len(true_rows) == 3  # the 2 originally-true sources plus the reassessed one

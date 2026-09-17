@@ -198,14 +198,22 @@ _CONTINUUM_VMAX_SIGMA = 25.0
 #: (much fainter) HI signal to near-invisibility the same way a bright compact
 #: source did for the continuum panel. Lower than the optical/continuum sigmas
 #: (which anchor a mostly-empty-sky background) since PV data has no comparable
-#: "background fills nearly the whole frame" assumption -- picked by comparing a
-#: grid of (vmin_sigma, vmax_sigma) against that real RFI-affected source (2.0, 4.0
-#: revealed its rotation-curve-like emission feature clearly while the RFI channel
-#: stayed visible, not hidden, as a bright but no longer scale-dominating row) and
-#: sanity-checked against three ordinary (non-RFI) real sources to confirm it
-#: doesn't wash out a normal PV trace.
-_PV_VMIN_SIGMA = 2.0
-_PV_VMAX_SIGMA = 4.0
+#: "background fills nearly the whole frame" assumption.
+#:
+#: An initial (2.0, 4.0) fixed the RFI case but drew a second, separate user
+#: report: with that pair, the median sits at vmin_sigma / (vmin_sigma+vmax_sigma)
+#: = 2/6 = 33% up viridis's range -- bright enough on its own to read as "the
+#: background is too bright" even with the real signal visible on top of it. The
+#: fix isn't excluding individual bad channels (tried first against a second real
+#: source with several moderately-elevated, non-RFI channels: made no visible
+#: difference, since a per-pixel sigma clip over the whole array already handles
+#: anything short of a true outlier like the RFI case) -- it's this ratio. (1.0,
+#: 8.0) puts the median at 1/9 = 11%, close to viridis's dark end, confirmed live
+#: to noticeably darken the background across three real sources (the RFI one
+#: plus two ordinary ones) while keeping every real signal feature just as visible
+#: as before, if not more so against the now-darker background.
+_PV_VMIN_SIGMA = 1.0
+_PV_VMAX_SIGMA = 8.0
 
 #: Colors cycled through for external-redshift-match markers/lines (see
 #: _external_matches), one per simultaneous match on a given source: matplotlib's

@@ -183,6 +183,12 @@ class TestPostprocessCli:
         assert mosaic_path.exists()
         assert fits.getdata(mosaic_path).shape == (1000, 1000)
 
+        uncertain_mosaic_path = (
+            validated_config.paths.postprocess_dir / "uncertain" / "mosaic_uncertain.fits"
+        )
+        assert uncertain_mosaic_path.exists()
+        assert fits.getdata(uncertain_mosaic_path).shape == (1000, 1000)
+
         velocity_png_path = validated_config.paths.postprocess_dir / "true" / "mosaic_true.png"
         assert velocity_png_path.exists()
 
@@ -199,8 +205,13 @@ class TestPostprocessCli:
         assert validated_config.paths.field_mosaic is None
         postprocess.run(validated_config)
         assert not (validated_config.paths.postprocess_dir / "true" / "mosaic_true.fits").exists()
+        assert not (
+            validated_config.paths.postprocess_dir / "uncertain" / "mosaic_uncertain.fits"
+        ).exists()
 
-    def test_does_not_build_mosaics_for_non_true_classes(self, validated_config, monkeypatch):
+    def test_only_true_and_uncertain_get_moment0_mosaics_and_only_true_gets_more(
+        self, validated_config, monkeypatch
+    ):
         monkeypatch.setattr("hivalidate.cutouts.optical.requests.get", _stub_legacy_survey_get)
         monkeypatch.setattr(
             "hivalidate.cutouts.optical.SkyView.get_images", _stub_skyview_get_images
@@ -216,13 +227,19 @@ class TestPostprocessCli:
 
         postprocess.run(validated_config)
 
-        for class_name in ("false", "uncertain", "duplicate"):
+        # false/duplicate: no mosaic artifacts of any kind.
+        for class_name in ("false", "duplicate"):
             assert not list(
                 (validated_config.paths.postprocess_dir / class_name).glob("mosaic_*.fits")
             )
             assert not list(
                 (validated_config.paths.postprocess_dir / class_name).glob("mosaic_*.png")
             )
+
+        # uncertain: only the plain moment-0 mosaic FITS, nothing else.
+        uncertain_dir = validated_config.paths.postprocess_dir / "uncertain"
+        assert [f.name for f in uncertain_dir.glob("mosaic_*.fits")] == ["mosaic_uncertain.fits"]
+        assert not list(uncertain_dir.glob("mosaic_*.png"))
 
     def test_fails_clearly_if_qa_was_not_run(self, tmp_path):
         config = Config.from_yaml(FIXTURES / "config_mini.yaml")

@@ -13,13 +13,15 @@
   flat `dry_run/` directory -- so, e.g., every "uncertain" or "duplicate" source can be
   flicked back through later without hunting through hundreds of unrelated PNGs.
 - A mosaic FITS of the true class's moment-0 maps, reprojected onto the full field
-  (`mosaic_true.fits`) -- replaces `legacy/mosaic_sofia_true_detections.py`.
-  True-only: "where are the real detections" is the only one of these four classes
-  that question makes sense for. Plus a plain PNG of that same mosaic
-  (`mosaic_true.png`), each detection colored by its own systemic velocity rather
-  than flux, so large-scale velocity structure across the field is visible at a
-  glance (`build_velocity_mosaic`, `hivalidate.plotting.
-  build_true_detections_velocity_figure`) -- direct user request.
+  (`mosaic_true.fits`) -- replaces `legacy/mosaic_sofia_true_detections.py`. Plus a
+  plain PNG of that same mosaic (`mosaic_true.png`), each detection colored by its
+  own systemic velocity rather than flux, so large-scale velocity structure across
+  the field is visible at a glance (`build_velocity_mosaic`, `hivalidate.plotting.
+  build_true_detections_velocity_figure`) -- direct user request. The uncertain
+  class also gets a plain moment-0 mosaic FITS (`mosaic_uncertain.fits`, direct
+  user request), so an ambiguous call's spatial distribution can be inspected the
+  same way -- but not the velocity-colored PNG or optical overview below, which
+  stay true-only unless asked for uncertain as well.
 - A PNG of that same mosaic overlaid as contours on an optical background image of
   the whole field, so the overall spatial distribution of real detections can be
   seen against the sky at a glance (`hivalidate.plotting.

@@ -1,8 +1,8 @@
-"""Build post-validation artifacts (CSV, cubelets, dry-run plots, and -- true only --
-a mosaic FITS, a velocity-colored PNG of that same mosaic, the field-wide optical
-background as its own FITS, and an optical-background overview PNG) for every
-reviewed QA class (true/false/uncertain/duplicate), each under its own
-`postprocess/<class_name>/` subdirectory.
+"""Build post-validation artifacts (CSV, cubelets, dry-run plots, and -- true and
+uncertain only -- a moment-0 mosaic FITS; true only, additionally, a velocity-colored
+PNG of that same mosaic, the field-wide optical background as its own FITS, and an
+optical-background overview PNG) for every reviewed QA class (true/false/uncertain/
+duplicate), each under its own `postprocess/<class_name>/` subdirectory.
 
 Run `hivalidate-qa` first (or at least far enough into a session that some sources
 have been reviewed -- this can be run against a partially-reviewed catalogue; classes
@@ -54,6 +54,7 @@ def run(config: Config) -> None:
 
     true_cubelets_dir = None
     true_sources = None
+    uncertain_cubelets_dir = None
     for class_name, qa_value in postprocess.QA_CLASSES.items():
         sources = postprocess.filter_by_qa(validated, {qa_value})
         logger.info(
@@ -93,6 +94,8 @@ def run(config: Config) -> None:
         if class_name == "true":
             true_cubelets_dir = cubelets_dir
             true_sources = sources
+        elif class_name == "uncertain":
+            uncertain_cubelets_dir = cubelets_dir
 
     if config.paths.field_mosaic is None:
         logger.info("No paths.field_mosaic configured -- skipping mosaic step")
@@ -103,6 +106,17 @@ def run(config: Config) -> None:
     mosaic_data = postprocess.build_mosaic(config.paths.field_mosaic, mom0_files, mosaic_path)
     logger.info("Wrote %s from %d moment-0 maps", mosaic_path, len(mom0_files))
     mosaic_wcs = WCS(fits.getheader(mosaic_path)).celestial
+
+    # Direct user request: a moment-0 mosaic for "uncertain" too, so an ambiguous
+    # call's spatial distribution across the field can be inspected the same way a
+    # true detection's can -- flux only, no velocity-colored PNG or optical overview
+    # (those stay true-only unless asked for uncertain as well).
+    uncertain_mom0_files = sorted(uncertain_cubelets_dir.glob("*_mom0.fits"))
+    uncertain_mosaic_path = config.paths.postprocess_dir / "uncertain" / "mosaic_uncertain.fits"
+    postprocess.build_mosaic(config.paths.field_mosaic, uncertain_mom0_files, uncertain_mosaic_path)
+    logger.info(
+        "Wrote %s from %d moment-0 maps", uncertain_mosaic_path, len(uncertain_mom0_files)
+    )
 
     # Each mom0_files entry is "<name>_mom0.fits" -- match it back to that source's
     # own velocity via the same name form the true-class CSV/cubelets already use.

@@ -187,6 +187,34 @@ class TestCrossmatchRedshifts:
         result = crossmatch.crossmatch_redshifts(hi_table, external, sep_arcsec=30.0)
         assert result.n_matched == 0
 
+    def test_zero_matches_anywhere_still_round_trips_through_votable(self, tmp_path):
+        # Regression test: when *every* row's external_z (etc.) ends up empty --
+        # zero matches anywhere in the whole table, not just for one row -- a plain
+        # list-of-empty-arrays assignment lets numpy collapse the column to a
+        # perfectly rectangular (n, 0) float64 array instead of an object array of
+        # (all zero-length) ragged arrays. astropy's VOTable reader crashes on that
+        # specific degenerate shape while computing a masked column's fill value
+        # (`IndexError: index 0 is out of bounds for axis 0 with size 0`) -- found
+        # live. Every other crossmatch test in this file has at least one match
+        # somewhere in the table, so none of them exercised this.
+        hi_table = _real_hi_table()
+        row = _real_source_row(hi_table)
+        center = SkyCoord(ra=float(row["ra"][0]), dec=float(row["dec"][0]), unit="deg")
+        offset = _offset_position(center, sep_arcsec=3600.0)  # 1 degree -- no match
+        matching_z = _matching_z(row)
+
+        external = Table(
+            {"z": [matching_z], "target_ra": [offset.ra.deg], "target_dec": [offset.dec.deg]}
+        )
+        result = crossmatch.crossmatch_redshifts(hi_table, external, sep_arcsec=30.0)
+        assert result.n_matched == 0
+
+        votable_path = tmp_path / "zero_match.xml"
+        catalogue.write_votable(result.table, votable_path)
+        round_tripped = catalogue.read_votable(votable_path)  # must not raise
+        assert len(round_tripped) == len(hi_table)
+        assert all(len(z) == 0 for z in round_tripped["external_z"])
+
     def test_keeps_every_candidate_within_both_tolerances_closest_first(self):
         # An HI detection can have more than one real optical counterpart (an
         # interacting pair, a gas-rich group) since HI is often more spatially

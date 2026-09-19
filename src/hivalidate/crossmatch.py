@@ -174,12 +174,23 @@ def crossmatch_redshifts(
                     external_id[hi_idx] = ext_id[ext_group]
                 external_catalogue_name[hi_idx] = catalogue_name
 
-    hi_table["external_z"] = external_z
-    hi_table["external_ra"] = external_ra
-    hi_table["external_dec"] = external_dec
-    hi_table["external_sep_arcsec"] = external_sep_arcsec
-    hi_table["external_vel_diff_km_s"] = external_vel_diff_km_s
-    hi_table["external_id"] = external_id
+    # dtype=object forced explicitly, not left to numpy's own inference: a plain
+    # `hi_table[col] = [...]` assignment lets numpy pick the array's dtype/shape
+    # from the list's actual contents, and when *every* row's array happens to be
+    # empty (found live: a crossmatch with zero matches anywhere in the whole
+    # table), numpy collapses that to a perfectly rectangular `(n, 0)` float64
+    # array instead of an object array of ragged (here, all zero-length) arrays --
+    # a real astropy/numpy VOTable round-trip bug for that specific degenerate
+    # shape (`IndexError: index 0 is out of bounds for axis 0 with size 0`, from
+    # astropy trying to sample a fill value from an empty axis). Forcing
+    # dtype=object keeps every row a genuine ragged array regardless of length, so
+    # this degenerate case can't arise no matter how many (or how few) rows match.
+    hi_table["external_z"] = np.array(external_z, dtype=object)
+    hi_table["external_ra"] = np.array(external_ra, dtype=object)
+    hi_table["external_dec"] = np.array(external_dec, dtype=object)
+    hi_table["external_sep_arcsec"] = np.array(external_sep_arcsec, dtype=object)
+    hi_table["external_vel_diff_km_s"] = np.array(external_vel_diff_km_s, dtype=object)
+    hi_table["external_id"] = np.array(external_id, dtype=object)
     hi_table["external_catalogue_name"] = external_catalogue_name
     n_matched = sum(1 for z in external_z if len(z) > 0)
     return CrossmatchResult(table=hi_table, n_matched=n_matched)

@@ -7,6 +7,7 @@ exactly as `hivalidate-combine`/`-dedup`/`-rename` would.
 from pathlib import Path
 
 import pytest
+from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
@@ -104,6 +105,48 @@ def test_dedup_crossmatches_against_an_external_redshift_catalogue_when_configur
     assert matched_row["external_z"][0] == pytest.approx(matching_z)
     assert matched_row["external_catalogue_name"] == "DESI"
     assert list(matched_row["external_id"]) == [396330000123]
+
+
+def test_crossmatch_tolerance_is_independent_of_dedups(tmp_path):
+    # Direct user report: changing dedup's tolerance was unexpectedly also changing
+    # crossmatch results, because the crossmatch step used to reuse dedup's
+    # sep_arcsec/etc. directly. Proves the fix end-to-end through the real CLI:
+    # a match just outside dedup's own tolerance but inside an explicit,
+    # independent crossmatch.sep_arcsec must be found -- and must NOT be found
+    # when crossmatch: is left unset (falling back to dedup's smaller value).
+    config = _load_config(tmp_path)
+    combine.run(config)
+    combined = catalogue.read_votable(config.paths.combined_catalogue)
+    deduped_no_crossmatch = catalogue.deduplicate_positional(combined).table
+    row = deduped_no_crossmatch[deduped_no_crossmatch["name"] == "SoFiA J203213.07-563318.1"]
+    assert len(row) == 1, "fixture assumption changed -- update this test"
+
+    center = SkyCoord(ra=float(row["ra"][0]), dec=float(row["dec"][0]), unit="deg")
+    # 45" away -- outside dedup's default 30" tolerance (config_mini.yaml), inside a
+    # deliberately larger crossmatch-only tolerance set below.
+    offset_center = SkyCoord(ra=center.ra, dec=center.dec + 45.0 * u.arcsec)
+    velocity_km_s = conversions.freq_to_velocity(float(row["freq"][0]))
+    matching_z = velocity_km_s / conversions.SPEED_OF_LIGHT_KM_S
+    external_path = tmp_path / "external_redshifts.xml"
+    Table(
+        {
+            "z": [matching_z],
+            "target_ra": [offset_center.ra.deg],
+            "target_dec": [offset_center.dec.deg],
+        }
+    ).write(external_path, format="votable")
+    config.paths.external_redshift_catalogue = external_path
+
+    dedup.run(config)  # crossmatch: unset -> falls back to dedup's 30", no match
+    deduped = catalogue.read_votable(config.paths.deduped_catalogue)
+    unmatched_row = deduped[deduped["name"] == "SoFiA J203213.07-563318.1"][0]
+    assert len(unmatched_row["external_z"]) == 0
+
+    config.crossmatch.sep_arcsec = 60.0  # explicit override, independent of dedup
+    dedup.run(config)
+    deduped = catalogue.read_votable(config.paths.deduped_catalogue)
+    matched_row = deduped[deduped["name"] == "SoFiA J203213.07-563318.1"][0]
+    assert len(matched_row["external_z"]) == 1
 
 
 def test_dedup_fails_clearly_if_combine_was_not_run_first(tmp_path):

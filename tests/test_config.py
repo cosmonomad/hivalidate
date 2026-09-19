@@ -42,6 +42,60 @@ def test_dedup_settings_default_to_documented_values():
     assert config.dedup.vel_tol_wm50_factor == 0.6
 
 
+class TestCrossmatchSettings:
+    def test_defaults_to_unset_when_no_crossmatch_section_given(self):
+        config = Config.from_yaml(FIXTURES / "config_mini.yaml")
+        assert config.crossmatch.sep_arcsec is None
+        assert config.crossmatch.vel_tol_base_km_s is None
+        assert config.crossmatch.vel_tol_wm50_factor is None
+
+    def test_resolved_falls_back_entirely_to_dedup_when_all_unset(self, tmp_path):
+        raw = {
+            "field_name": "bogus",
+            "paths": {"raw_sofia_dir": str(tmp_path), "work_dir": str(tmp_path / "work")},
+            "dedup": {"sep_arcsec": 15.0, "vel_tol_base_km_s": 20.0, "vel_tol_wm50_factor": 0.4},
+        }
+        config = Config.from_dict(raw)
+        resolved = config.crossmatch.resolved(config.dedup)
+        assert resolved.sep_arcsec == 15.0
+        assert resolved.vel_tol_base_km_s == 20.0
+        assert resolved.vel_tol_wm50_factor == 0.4
+
+    def test_resolved_uses_explicit_crossmatch_values_over_dedups(self, tmp_path):
+        raw = {
+            "field_name": "bogus",
+            "paths": {"raw_sofia_dir": str(tmp_path), "work_dir": str(tmp_path / "work")},
+            "dedup": {"sep_arcsec": 15.0, "vel_tol_base_km_s": 20.0, "vel_tol_wm50_factor": 0.4},
+            "crossmatch": {"sep_arcsec": 60.0},
+        }
+        config = Config.from_dict(raw)
+        resolved = config.crossmatch.resolved(config.dedup)
+        # Explicitly overridden field takes the crossmatch: value...
+        assert resolved.sep_arcsec == 60.0
+        # ...but a field left unset in crossmatch: still falls back to dedup's.
+        assert resolved.vel_tol_base_km_s == 20.0
+        assert resolved.vel_tol_wm50_factor == 0.4
+
+    def test_changing_dedup_alone_does_not_change_an_explicit_crossmatch_override(
+        self, tmp_path
+    ):
+        # The exact scenario this feature was added for: retuning dedup's own
+        # tolerance must not silently move a crossmatch tolerance that was
+        # deliberately set independently.
+        raw = {
+            "field_name": "bogus",
+            "paths": {"raw_sofia_dir": str(tmp_path), "work_dir": str(tmp_path / "work")},
+            "dedup": {"sep_arcsec": 15.0},
+            "crossmatch": {"sep_arcsec": 60.0},
+        }
+        config = Config.from_dict(raw)
+        assert config.crossmatch.resolved(config.dedup).sep_arcsec == 60.0
+
+        raw["dedup"]["sep_arcsec"] = 45.0
+        retuned_config = Config.from_dict(raw)
+        assert retuned_config.crossmatch.resolved(retuned_config.dedup).sep_arcsec == 60.0
+
+
 def test_derived_paths_are_under_work_dir(tmp_path):
     raw = {
         "field_name": "bogus",

@@ -132,8 +132,13 @@ astropy's unified I/O -- verified against a real DESI VOTable-XML TAP query resu
 `target_dec`/`z` column names (e.g. GAMA's `RA`/`DEC`/`Z`), pass the right names to
 `hivalidate.crossmatch.read_external_catalogue`/`crossmatch_redshifts` if calling
 these directly -- the CLI stage itself currently assumes DESI's naming.
-Position/velocity tolerance reuses the same `dedup:` settings (`sep_arcsec`,
-`vel_tol_base_km_s`, `vel_tol_wm50_factor`) used for self-deduplication.
+Position/velocity tolerance comes from its own `crossmatch:` settings
+(`sep_arcsec`, `vel_tol_base_km_s`, `vel_tol_wm50_factor`), independent of the
+`dedup:` settings used for self-deduplication -- a genuinely different matching
+problem (an HI centroid against an external catalogue's own, differently-precise
+positions). Any field left unset in `crossmatch:` (or the whole section, if
+omitted) falls back to `dedup:`'s value for that field, so an existing config that
+predates this section behaves exactly as before.
 
 ## CASDA / RACS access
 

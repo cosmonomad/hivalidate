@@ -26,15 +26,58 @@ class DedupSettings:
     sub-cube runs can both catch a source near their shared boundary -- see PLAN.md
     issue #5). Velocity tolerance follows the same functional form the legacy
     script used for its GAMA cross-match: ``vel_tol = wm50_factor * wm50 +
-    base_km_s``. Reused as-is by `crossmatch.crossmatch_redshifts` (run by
-    `hivalidate-dedup` when `paths.external_redshift_catalogue` is set) -- one
-    tolerance definition for both kinds of position/velocity matching, rather than
-    a second copy of these three settings.
+    base_km_s``.
+
+    Was also reused directly by `crossmatch.crossmatch_redshifts` -- see
+    `CrossmatchSettings` for why that turned out to be the wrong default (direct
+    user report: changing this tolerance was unexpectedly also changing crossmatch
+    results) and how the two are decoupled now.
     """
 
     sep_arcsec: float = 30.0
     vel_tol_base_km_s: float = 30.0
     vel_tol_wm50_factor: float = 0.6
+
+
+@dataclass
+class CrossmatchSettings:
+    """Positional/velocity cross-match tolerance for `crossmatch.crossmatch_redshifts`
+    (run by `hivalidate-dedup`, right after deduplication, when
+    `paths.external_redshift_catalogue` is set) -- independent of `DedupSettings`,
+    which is a genuinely different matching problem: SoFiA-vs-SoFiA duplicate
+    detections from the same instrument/observation, vs. an HI centroid against an
+    external optical/spectroscopic catalogue's own, differently-precise positions.
+    These don't necessarily want the same tolerance, but originally shared
+    `DedupSettings` directly (one definition for both) -- direct user report:
+    changing `dedup.sep_arcsec` (etc.) to retune duplicate removal was unexpectedly
+    also changing crossmatch results, with no way to change one without the other.
+
+    Each field left unset (`None`, the default) falls back to `DedupSettings`' own
+    value at the point of use (see `resolved`), not a fixed independent default --
+    this is what keeps an existing config's behavior unchanged unless a
+    `crossmatch:` section is added, rather than silently diverging from whatever
+    `dedup:` says the moment this settings block was introduced.
+    """
+
+    sep_arcsec: float | None = None
+    vel_tol_base_km_s: float | None = None
+    vel_tol_wm50_factor: float | None = None
+
+    def resolved(self, dedup: DedupSettings) -> "CrossmatchSettings":
+        """This settings block with every unset field filled in from `dedup`."""
+        return CrossmatchSettings(
+            sep_arcsec=self.sep_arcsec if self.sep_arcsec is not None else dedup.sep_arcsec,
+            vel_tol_base_km_s=(
+                self.vel_tol_base_km_s
+                if self.vel_tol_base_km_s is not None
+                else dedup.vel_tol_base_km_s
+            ),
+            vel_tol_wm50_factor=(
+                self.vel_tol_wm50_factor
+                if self.vel_tol_wm50_factor is not None
+                else dedup.vel_tol_wm50_factor
+            ),
+        )
 
 
 @dataclass
@@ -125,6 +168,7 @@ class Config:
     field_name: str
     paths: Paths
     dedup: DedupSettings = field(default_factory=DedupSettings)
+    crossmatch: CrossmatchSettings = field(default_factory=CrossmatchSettings)
     cosmology: CosmologySettings = field(default_factory=CosmologySettings)
     cutouts: CutoutSettings = field(default_factory=CutoutSettings)
 
@@ -169,6 +213,7 @@ class Config:
             raise ValueError(f"Config 'paths' section is missing required key: {exc}") from exc
 
         dedup = DedupSettings(**raw.get("dedup", {}))
+        crossmatch = CrossmatchSettings(**raw.get("crossmatch", {}))
         cosmology = CosmologySettings(**raw.get("cosmology", {}))
 
         cutouts_raw = dict(raw.get("cutouts", {}))
@@ -177,7 +222,12 @@ class Config:
         cutouts = CutoutSettings(**cutouts_raw)
 
         config = cls(
-            field_name=field_name, paths=paths, dedup=dedup, cosmology=cosmology, cutouts=cutouts
+            field_name=field_name,
+            paths=paths,
+            dedup=dedup,
+            crossmatch=crossmatch,
+            cosmology=cosmology,
+            cutouts=cutouts,
         )
         config.validate()
         return config

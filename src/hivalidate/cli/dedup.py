@@ -50,12 +50,16 @@ def run(config: Config) -> None:
             config.paths.external_redshift_catalogue,
             id_column=config.paths.external_redshift_catalogue_id_column,
         )
+        # Own tolerance, independent of dedup's -- see CrossmatchSettings' docstring
+        # for why sharing dedup's directly (the old behaviour) was wrong. Any field
+        # left unset in config.crossmatch falls back to config.dedup's own value.
+        cx_tolerance = config.crossmatch.resolved(config.dedup)
         cx_result = crossmatch.crossmatch_redshifts(
             deduped,
             external,
-            sep_arcsec=config.dedup.sep_arcsec,
-            vel_tol_base_km_s=config.dedup.vel_tol_base_km_s,
-            vel_tol_wm50_factor=config.dedup.vel_tol_wm50_factor,
+            sep_arcsec=cx_tolerance.sep_arcsec,
+            vel_tol_base_km_s=cx_tolerance.vel_tol_base_km_s,
+            vel_tol_wm50_factor=cx_tolerance.vel_tol_wm50_factor,
             catalogue_name=config.paths.external_redshift_catalogue_name,
             id_column=config.paths.external_redshift_catalogue_id_column,
         )

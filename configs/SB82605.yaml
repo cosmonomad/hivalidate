@@ -22,6 +22,17 @@ dedup:
   vel_tol_base_km_s: 30.0
   vel_tol_wm50_factor: 0.6
 
+# Position/velocity tolerance for matching against paths.external_redshift_catalogue,
+# independent of dedup's own tolerance above -- any field left out here falls back
+# to dedup's value, so this section is optional. Inert for this config specifically
+# (external_redshift_catalogue is unset above, so crossmatching never runs), kept
+# here anyway for consistency with configs/NGC4808.yaml and so it's ready to use if
+# an external catalogue is added later.
+crossmatch:
+  sep_arcsec: 30.0
+  vel_tol_base_km_s: 30.0
+  vel_tol_wm50_factor: 0.6
+
 cosmology:
   h0: 70.0
   om0: 0.3

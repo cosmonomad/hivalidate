@@ -57,6 +57,11 @@ class CrossmatchSettings:
     this is what keeps an existing config's behavior unchanged unless a
     `crossmatch:` section is added, rather than silently diverging from whatever
     `dedup:` says the moment this settings block was introduced.
+
+    See `crossmatch.crossmatch_redshifts`'s own docstring for where its defaults
+    (30"/30 km/s/0.6) actually come from -- ASKAP's beam size and DESI's typical
+    redshift error, not arbitrary numbers -- and the empirical purity check run
+    against real NGC4808 data confirming them.
     """
 
     sep_arcsec: float | None = None

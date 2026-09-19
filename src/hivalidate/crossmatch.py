@@ -76,6 +76,21 @@ def crossmatch_redshifts(
     against an independent optical/spectroscopic redshift instead of another HI
     detection.
 
+    Default provenance (direct user input, dev session 2026-09-19; previously
+    undocumented, both here and in the legacy script this was ported from):
+    `sep_arcsec`'s default (30") is set by ASKAP's own beam size, since that's what
+    limits how precisely a SoFiA-derived HI position can be centroided in the first
+    place; `vel_tol_base_km_s`'s default (30 km/s) is set by DESI's typical
+    spectroscopic redshift error -- both chosen for the instruments actually in
+    play here, not arbitrary round numbers. Empirically validated against real
+    NGC4808 DESI crossmatch data the same day: a randomized-position control (200
+    trials, DESI positions shifted within the field, breaking any real
+    association) found ~0.1 chance matches on average vs. 160 real ones (>99.9%
+    estimated purity at these defaults), and `n_matched` is flat across a wide
+    range around both defaults (`vel_tol_wm50_factor` 0.4-0.8 and
+    `vel_tol_base_km_s` 0-40 all give the identical 160) -- so besides being
+    physically motivated, the exact values aren't sitting on a sensitive edge.
+
     Keeps *every* external-catalogue row within `sep_arcsec` that also passes the
     velocity tolerance, not just one -- an HI detection can legitimately have more
     than one real optical counterpart (an interacting pair, a gas-rich group, a

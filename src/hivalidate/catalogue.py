@@ -135,6 +135,12 @@ def deduplicate_positional(
       self-matching -- a broader galaxy should tolerate a larger velocity offset
       between two independent centroid measurements of the same source).
 
+    `sep_arcsec`'s default (30") is set by ASKAP's own beam size (direct user input,
+    dev session 2026-09-19) -- the same reasoning applies here as for
+    `crossmatch.crossmatch_redshifts`'s identical default, since this is still two
+    ASKAP-derived centroids being compared, just against each other instead of an
+    external catalogue.
+
     Within each group of mutually-matching rows, keeps the row with the highest value
     of `quality_column` (default: `snr`) and drops the rest. This is a deliberate
     choice over the legacy script's "keep whichever row came first alphabetically by
